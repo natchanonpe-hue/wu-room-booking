@@ -91,10 +91,11 @@
             </div>
 
             <!-- แท็บสลับสถานะ -->
-            <div class="flex gap-2 mb-4 bg-white p-1 rounded-lg shadow-sm border border-gray-200">
-                <button class="tab-btn flex-1 py-2 rounded-md text-xs font-bold text-gray-600" data-tab="pending" onclick="setAdminTab('pending')">⏳ รออนุมัติ</button>
-                <button class="tab-btn flex-1 py-2 rounded-md text-xs font-bold text-gray-600" data-tab="approved" onclick="setAdminTab('approved')">✅ อนุมัติแล้ว</button>
-                <button class="tab-btn flex-1 py-2 rounded-md text-xs font-bold text-gray-600" data-tab="rejected" onclick="setAdminTab('rejected')">❌ ไม่อนุมัติ</button>
+            <div class="flex gap-1 mb-4 bg-white p-1 rounded-lg shadow-sm border border-gray-200">
+                <button class="tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="pending" onclick="setAdminTab('pending')">⏳ รออนุมัติ</button>
+                <button class="tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="approved" onclick="setAdminTab('approved')">✅ อนุมัติแล้ว</button>
+                <button class="tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="rejected" onclick="setAdminTab('rejected')">❌ ไม่อนุมัติ</button>
+                <button class="tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="cancelled" onclick="setAdminTab('cancelled')">🚫 ยกเลิก</button>
             </div>
 
             <div id="admin-requests-container" class="space-y-3">
@@ -315,7 +316,7 @@
     // ==========================================
     const OPEN_HOUR = 8;
     const CLOSE_HOUR = 20;
-    const ADMIN_PASSWORD = "WUadmin007";
+    const ADMIN_PASSWORD = "A7707";
     const MAX_ADVANCE_DAYS = 7; 
 
     // ข้อมูลตารางเรียนจาก Booking1.xlsx (อ้างอิงรายชั่วโมง; 1 = จันทร์, ..., 6 = เสาร์, 0 = อาทิตย์)
@@ -489,6 +490,7 @@
     function statusBadge(status) {
         if (status === 'approved') return `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded shadow-sm">✅ อนุมัติแล้ว</span>`;
         if (status === 'rejected') return `<span class="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1 rounded shadow-sm">❌ ไม่อนุมัติ</span>`;
+        if (status === 'cancelled') return `<span class="bg-gray-200 text-gray-600 text-[10px] font-bold px-2 py-1 rounded shadow-sm">🚫 ยกเลิกแล้ว</span>`;
         return `<span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1 rounded shadow-sm">⏳ รออนุมัติ</span>`;
     }
 
@@ -509,7 +511,7 @@
         emptyMsg.classList.add('hidden-view');
 
         filtered.forEach(b => {
-            const borderColor = b.status === 'approved' ? 'border-green-400' : b.status === 'rejected' ? 'border-red-400' : 'border-yellow-400';
+            const borderColor = b.status === 'approved' ? 'border-green-400' : b.status === 'rejected' ? 'border-red-400' : b.status === 'cancelled' ? 'border-gray-400' : 'border-yellow-400';
             const card = document.createElement('div');
             card.className = `bg-white p-4 rounded-lg shadow border-l-4 ${borderColor}`;
             card.innerHTML = `
@@ -542,6 +544,39 @@
             });
     }
 
+    // ==========================================
+    // 4.1 ระบบจำกัด "1 คน จองได้แค่ 1 ห้อง" ในช่วงเวลาเดียวกัน
+    // ==========================================
+    // เช็คว่าการจองรายการนี้ "ยังไม่หมดเวลา" อยู่หรือไม่ (นับเฉพาะ pending/approved)
+    function isBookingActive(b) {
+        if (b.status !== 'pending' && b.status !== 'approved') return false;
+        const nowDate = todayStr();
+        if (b.date > nowDate) return true;   // จองล่วงหน้าวันถัดไป ยังถือว่า active อยู่เสมอ
+        if (b.date < nowDate) return false;  // วันที่จองผ่านไปแล้ว ถือว่าหมดอายุ
+        // กรณีจองวันเดียวกับวันนี้ ให้เช็คว่าชั่วโมงสิ้นสุดผ่านไปหรือยัง
+        const endHour = parseInt(b.time.split('-')[1].split(':')[0], 10);
+        return new Date().getHours() < endHour;
+    }
+
+    // หาการจองที่ "ยังใช้งานอยู่" ของผู้ใช้คนนี้ (ถ้ามี คือคนนี้จองห้องไว้แล้วยังไม่หมดเวลา)
+    function getUserActiveBooking(userId) {
+        const bookings = loadBookings() || [];
+        return bookings.find(b => b.userId === userId && isBookingActive(b));
+    }
+
+    // ผู้ใช้กดยกเลิกการจองของตัวเอง
+    function cancelBooking(bookingId) {
+        if (!confirm("ยืนยันยกเลิกการจองนี้หรือไม่?\n(ห้องจะว่างให้คนอื่นจองได้ทันที)")) return;
+        bookingsRef.child(bookingId).update({ status: 'cancelled' })
+            .then(() => {
+                showToast("✅ ยกเลิกการจองเรียบร้อยแล้ว");
+            })
+            .catch((err) => {
+                console.error(err);
+                showToast("⚠️ ยกเลิกไม่สำเร็จ ลองใหม่อีกครั้ง");
+            });
+    }
+
     function renderUserHistory() {
         const bookings = loadBookings() || [];
         const myBookings = bookings.filter(b => b.userId === currentUserId).sort((a,b) => b.createdAt - a.createdAt);
@@ -557,7 +592,8 @@
         emptyMsg.classList.add('hidden-view');
         
         myBookings.forEach(b => {
-            const borderColor = b.status === 'approved' ? 'border-green-400' : b.status === 'rejected' ? 'border-red-400' : 'border-yellow-400';
+            const borderColor = b.status === 'approved' ? 'border-green-400' : b.status === 'rejected' ? 'border-red-400' : b.status === 'cancelled' ? 'border-gray-400' : 'border-yellow-400';
+            const canCancel = isBookingActive(b); // ยกเลิกได้เฉพาะรายการที่ pending/approved และยังไม่หมดเวลา
             const card = document.createElement('div');
             card.className = `bg-white p-4 rounded-lg shadow-sm border-l-4 ${borderColor}`;
             card.innerHTML = `
@@ -569,6 +605,7 @@
                     ${statusBadge(b.status)}
                 </div>
                 <p class="text-sm text-gray-600 border-t pt-2 mt-2">เหตุผล: ${b.reason}</p>
+                ${canCancel ? `<button onclick="cancelBooking('${b.id}')" class="w-full mt-3 bg-red-50 border border-red-300 text-red-600 py-2 rounded-lg text-xs font-bold hover:bg-red-100">🚫 ยกเลิกการจองนี้</button>` : ''}
             `;
             container.appendChild(card);
         });
@@ -599,6 +636,13 @@
     // ==========================================
     document.querySelectorAll('.room-btn').forEach(btn => {
         btn.addEventListener('click', function() {
+            // เตือนทันทีถ้ามีการจองที่ยังไม่หมดเวลาอยู่แล้ว จะได้ไม่เสียเวลาเลือกช่วงเวลา
+            const activeBooking = getUserActiveBooking(currentUserId);
+            if (activeBooking) {
+                alert(`⚠️ คุณได้จองห้องไปแล้ว!\n\nห้อง: ${activeBooking.room}\nวันที่: ${activeBooking.date}\nเวลา: ${activeBooking.time}\nสถานะ: ${activeBooking.status === 'approved' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}\n\nกรุณารอให้ครบกำหนดเวลาเดิมก่อน หรือไปยกเลิกการจองเดิมที่หน้า "ประวัติการจองของฉัน" จึงจะจองห้องใหม่ได้`);
+                return;
+            }
+
             const roomName = this.getAttribute('data-room');
             selectedRoomName = roomName;
             document.getElementById('selected-room-name').innerText = roomName;
@@ -647,7 +691,7 @@
                 continue;
             }
 
-            const existing = bookings.find(b => b.room === roomName && b.date === dateStr && b.time === timeText && b.status !== 'rejected');
+            const existing = bookings.find(b => b.room === roomName && b.date === dateStr && b.time === timeText && b.status !== 'rejected' && b.status !== 'cancelled');
             if (existing) {
                 if (existing.status === 'approved') {
                     btn.classList.add('slot-booked');
@@ -696,6 +740,13 @@
 
         if (!reason) return alert("⚠️ กรุณาระบุเหตุผลการใช้งานครับ");
         if (!selectedTimeSlotText) return alert("⚠️ กรุณาเลือกช่วงเวลาก่อนครับ");
+
+        // 🔒 1 คน จองได้แค่ 1 ห้องในช่วงเวลาเดียวกัน ถ้ามีการจองที่ยังไม่หมดเวลาอยู่ ห้ามจองซ้ำ
+        const activeBooking = getUserActiveBooking(currentUserId);
+        if (activeBooking) {
+            alert(`⚠️ คุณได้จองห้องไปแล้ว!\n\nห้อง: ${activeBooking.room}\nวันที่: ${activeBooking.date}\nเวลา: ${activeBooking.time}\nสถานะ: ${activeBooking.status === 'approved' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}\n\nกรุณารอให้ครบกำหนดเวลาเดิมก่อน หรือไปยกเลิกการจองเดิมที่หน้า "ประวัติการจองของฉัน" จึงจะจองห้องใหม่ได้`);
+            return;
+        }
 
         const newBooking = {
             room: room,
