@@ -75,7 +75,7 @@
         <div id="view-login" class="hidden-view flex-1 flex flex-col justify-center py-10">
             <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
                 <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">🔐 รหัสผ่าน Admin</h2>
-                <input type="password" id="admin-password" placeholder="ใส่รหัสผ่าน (WUadmin07)" class="w-full p-3 border border-gray-300 rounded-lg text-lg text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
+                <input type="password" id="admin-password" placeholder="ใส่รหัสผ่าน (0000)" class="w-full p-3 border border-gray-300 rounded-lg text-lg text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
                 <button onclick="loginAdmin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold text-lg shadow">เข้าสู่ระบบ</button>
                 <button onclick="switchView('view-role')" class="w-full mt-3 text-gray-500 text-sm py-2 hover:bg-gray-100 rounded-lg">กลับหน้าแรก</button>
             </div>
@@ -315,7 +315,7 @@
     // ==========================================
     const OPEN_HOUR = 8;
     const CLOSE_HOUR = 20;
-    const ADMIN_PASSWORD = "0000";
+    const ADMIN_PASSWORD = "WUadmin007";
     const MAX_ADVANCE_DAYS = 7; 
 
     // ข้อมูลตารางเรียนจาก Booking1.xlsx (อ้างอิงรายชั่วโมง; 1 = จันทร์, ..., 6 = เสาร์, 0 = อาทิตย์)
