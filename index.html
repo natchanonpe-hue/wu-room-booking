@@ -397,8 +397,9 @@
     // 1.1 ระบบแจ้งเตือนแบบ Push จริง ผ่าน Firebase Cloud Messaging (FCM)
     // ทำงานได้แม้ปิดแท็บ/ปิดเบราว์เซอร์ไปแล้ว (ยกเว้น iPhone ต้อง "เพิ่มไปหน้าจอโฮม" ก่อน เพราะข้อจำกัดของ Apple)
     // ==========================================
-    const VAPID_KEY = "BCLieHftg_d-MnzNpHSg-nVVWFVxUAg7w5T5QHqV4W2E4NNWdcNpLU5rCG9GujZmGKFNAWVl5eE0hdgzzkfQh48
-"; // หาได้ที่ Firebase Console > Project Settings > Cloud Messaging > Web Push certificates > Generate key pair
+    const VAPID_KEY = "BCLieHftg_d-MnzNpHSg-nVVWFVxUAg7w5T5QHqV4W2E4NNWdcNpLU5rCG9GujZmGKFNAWVl5eE0hdgzzkfQh48"
+ 
+    // หาได้ที่ Firebase Console > Project Settings > Cloud Messaging > Web Push certificates > Generate key pair
     let notificationsEnabled = false;
     let messaging = null;
 
