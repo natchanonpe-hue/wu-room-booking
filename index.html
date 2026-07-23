@@ -8,6 +8,7 @@
 <!-- Firebase SDK (compat build เพื่อให้ใช้ onclick="..." แบบเดิมในหน้า HTML ได้โดยไม่ต้องแก้ทั้งไฟล์) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
 <style>
     .map-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .hidden-view { display: none !important; }
@@ -319,7 +320,7 @@
     // ==========================================
     const OPEN_HOUR = 8;
     const CLOSE_HOUR = 20;
-    const ADMIN_PASSWORD = "A720080";
+    const ADMIN_PASSWORD = "0000";
     const MAX_ADVANCE_DAYS = 7; 
 
     // ข้อมูลตารางเรียนจาก Booking1.xlsx (อ้างอิงรายชั่วโมง; 1 = จันทร์, ..., 6 = เสาร์, 0 = อาทิตย์)
@@ -365,7 +366,6 @@
     // ==========================================
     let bookingsCache = [];        // แคชข้อมูลล่าสุดที่ sync มาจาก Firebase (อ่านแบบ sync ได้เหมือนของเดิม)
     let firebaseReady = false;
-    let lastKnownStatusById = null; // ใช้เทียบว่ามีอะไรเปลี่ยนไปบ้างระหว่างการ sync แต่ละรอบ (สำหรับแจ้งเตือน)
 
     function loadBookings() {
         // ฟังก์ชันนี้ยังคงชื่อ/พฤติกรรมเดิมไว้ เพื่อไม่ต้องแก้โค้ดจุดอื่นที่เรียกใช้อยู่
@@ -376,30 +376,7 @@
         bookingsRef.on('value', (snapshot) => {
             const data = snapshot.val() || {};
             // Firebase เก็บเป็น object ที่ key คือ id ที่สุ่มมาให้ ต้องแปลงกลับเป็น array
-            const newCache = Object.keys(data).map(key => ({ id: key, ...data[key] }));
-
-            // ตรวจจับการเปลี่ยนแปลงเพื่อยิง Notification (ข้าม sync รอบแรกสุด กันแจ้งเตือนย้อนหลังข้อมูลเก่า)
-            if (lastKnownStatusById !== null) {
-                newCache.forEach(b => {
-                    const prevStatus = lastKnownStatusById[b.id];
-                    // มีคำขอจองใหม่เข้ามา -> แจ้งเตือนฝั่งแอดมิน
-                    if (prevStatus === undefined && b.status === 'pending') {
-                        fireNativeNotification('📋 มีคำขอจองห้องใหม่', `ห้อง ${b.room} วันที่ ${b.date} เวลา ${b.time}\nผู้จอง: ${b.userId}`);
-                    }
-                    // สถานะการจองของ "ตัวเอง" เปลี่ยนไป -> แจ้งเตือนฝั่งผู้ใช้
-                    if (prevStatus && prevStatus !== b.status && b.userId === currentUserId) {
-                        if (b.status === 'approved') {
-                            fireNativeNotification('✅ การจองของคุณได้รับอนุมัติแล้ว', `ห้อง ${b.room} วันที่ ${b.date} เวลา ${b.time}`);
-                        } else if (b.status === 'rejected') {
-                            fireNativeNotification('❌ การจองของคุณไม่ได้รับอนุมัติ', `ห้อง ${b.room} วันที่ ${b.date} เวลา ${b.time}`);
-                        }
-                    }
-                });
-            }
-            lastKnownStatusById = {};
-            newCache.forEach(b => { lastKnownStatusById[b.id] = b.status; });
-
-            bookingsCache = newCache;
+            bookingsCache = Object.keys(data).map(key => ({ id: key, ...data[key] }));
             firebaseReady = true;
             refreshCurrentViews();
         }, (error) => {
@@ -417,36 +394,75 @@
     }
 
     // ==========================================
-    // 1.1 ระบบแจ้งเตือนผ่านเบราว์เซอร์ (Web Notification)
-    // หมายเหตุ: ทำงานได้ตราบใดที่ "แท็บ/หน้าต่างนี้ยังเปิดอยู่" (จะย่อหน้าต่างหรือสลับไปแท็บอื่นได้)
-    // แต่ถ้าปิดเบราว์เซอร์ไปเลยจะไม่ได้รับแจ้งเตือน เพราะระบบนี้ไม่มีเซิร์ฟเวอร์ฝั่งหลังบ้านคอยส่ง Push จริง
+    // 1.1 ระบบแจ้งเตือนแบบ Push จริง ผ่าน Firebase Cloud Messaging (FCM)
+    // ทำงานได้แม้ปิดแท็บ/ปิดเบราว์เซอร์ไปแล้ว (ยกเว้น iPhone ต้อง "เพิ่มไปหน้าจอโฮม" ก่อน เพราะข้อจำกัดของ Apple)
     // ==========================================
+    const VAPID_KEY = "BCLieHftg_d-MnzNpHSg-nVVWFVxUAg7w5T5QHqV4W2E4NNWdcNpLU5rCG9GujZmGKFNAWVl5eE0hdgzzkfQh48"; // หาได้ที่ Firebase Console > Project Settings > Cloud Messaging > Web Push certificates > Generate key pair
     let notificationsEnabled = false;
+    let messaging = null;
 
     function initNotifications() {
-        if (!('Notification' in window)) return; // เบราว์เซอร์เก่าบางตัวไม่รองรับ ข้ามไปเงียบๆ
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) return; // เบราว์เซอร์เก่า/ไม่รองรับ ข้ามไปเงียบๆ
         notificationsEnabled = Notification.permission === 'granted';
         updateNotifyButtonUI();
+
+        navigator.serviceWorker.register('/firebase-messaging-sw.js').then((registration) => {
+            messaging = firebase.messaging();
+            if (notificationsEnabled) registerFcmToken(registration);
+
+            // รับข้อความตอนแอปเปิดอยู่ใช้งานพอดี (foreground) โชว์เป็น toast แทน native popup เพราะเห็นหน้าจออยู่แล้ว
+            messaging.onMessage((payload) => {
+                const title = (payload.notification && payload.notification.title) || 'แจ้งเตือน';
+                const body = (payload.notification && payload.notification.body) || '';
+                showToast(`${title}`);
+                console.log('Foreground message:', title, body);
+            });
+        }).catch(err => console.error("Service worker register error:", err));
     }
 
     function requestNotificationPermission() {
-        if (!('Notification' in window)) {
-            alert("😕 เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนครับ");
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+            alert("😕 เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนครับ\n(ถ้าใช้ iPhone ต้องกด 'เพิ่มไปยังหน้าจอโฮม' แล้วเปิดจากไอคอนนั้นก่อน ถึงจะรับ Push ได้ เป็นข้อจำกัดของ Apple)");
             return;
         }
         if (Notification.permission === 'denied') {
-            alert("🔒 คุณเคยปิดกั้นการแจ้งเตือนของเว็บนี้ไว้ครับ\nต้องไปเปิดเองที่ตั้งค่าเบราว์เซอร์ (กดไอคอนกุญแจ/ตั้งค่า ข้าง URL แถบที่อยู่ > อนุญาตการแจ้งเตือน) แล้วรีเฟรชหน้านี้ใหม่");
+            alert("🔒 คุณเคยปิดกั้นการแจ้งเตือนของเว็บนี้ไว้ครับ\nต้องไปเปิดเองที่ตั้งค่าเบราว์เซอร์ (ไอคอนกุญแจ/ตั้งค่า ข้าง URL แถบที่อยู่ > อนุญาตการแจ้งเตือน) แล้วรีเฟรชหน้านี้ใหม่");
             return;
         }
-        Notification.requestPermission().then(permission => {
+        Notification.requestPermission().then(async (permission) => {
             notificationsEnabled = permission === 'granted';
             updateNotifyButtonUI();
             if (notificationsEnabled) {
-                showToast("🔔 เปิดการแจ้งเตือนสำเร็จ!");
-                new Notification('WU Room Booking', { body: 'เปิดใช้งานการแจ้งเตือนเรียบร้อยแล้ว ✅ ทิ้งแท็บนี้ไว้เพื่อรับแจ้งเตือน' });
+                const registration = await navigator.serviceWorker.ready;
+                registerFcmToken(registration);
+                showToast("🔔 เปิดการแจ้งเตือนสำเร็จ! รับได้แม้ปิดแท็บนี้ไปแล้ว");
             } else {
                 showToast("⚠️ คุณไม่ได้อนุญาตการแจ้งเตือน");
             }
+        });
+    }
+
+    // ขอ FCM token ของอุปกรณ์นี้ แล้วบันทึกไว้ใน Firebase เพื่อใช้อ้างอิงตอนยิง Push
+    function registerFcmToken(registration) {
+        if (!messaging) messaging = firebase.messaging();
+        messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: registration })
+            .then((token) => {
+                if (!token) return;
+                if (currentUserId) {
+                    db.ref('fcmTokens/users/' + currentUserId).set(token);
+                }
+            })
+            .catch((err) => console.error("getToken error:", err));
+    }
+
+    // เรียกตอน Admin ล็อกอินสำเร็จ เพื่อลงทะเบียน token สำหรับรับแจ้งเตือน "คำขอใหม่"
+    function registerAdminFcmToken() {
+        if (!notificationsEnabled || !('serviceWorker' in navigator)) return;
+        navigator.serviceWorker.ready.then((registration) => {
+            if (!messaging) messaging = firebase.messaging();
+            messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: registration })
+                .then((token) => { if (token) db.ref('fcmTokens/admin').set(token); })
+                .catch((err) => console.error("getToken error:", err));
         });
     }
 
@@ -462,20 +478,14 @@
         }
     }
 
-    // ยิง Notification จริง (เรียกจากตัวตรวจจับความเปลี่ยนแปลงใน initFirebaseSync)
-    function fireNativeNotification(title, body) {
-        if (!notificationsEnabled) return;
-        // ถ้าแท็บนี้กำลังเปิดดูอยู่พอดี ไม่ต้องเด้ง Notification ซ้อน (มี toast/หน้าจอ refresh ให้เห็นอยู่แล้ว)
-        if (document.visibilityState === 'visible' && document.hasFocus()) return;
-        try {
-            const n = new Notification(title, {
-                body: body,
-                icon: 'https://cdn-icons-png.flaticon.com/512/3048/3048122.png'
-            });
-            n.onclick = () => { window.focus(); n.close(); };
-        } catch (e) {
-            console.error("Notification error:", e);
-        }
+    // เรียก Vercel Serverless Function (/api/send-notification) เพื่อสั่งยิง Push จริงไปหาอุปกรณ์ปลายทาง
+    function triggerPushNotification(targetToken, title, body) {
+        if (!targetToken) return;
+        fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: targetToken, title, body })
+        }).catch(err => console.error("push trigger error:", err));
     }
 
     // ==========================================
@@ -550,6 +560,11 @@
         document.getElementById('display-user-id').innerText = currentUserId;
         document.getElementById('user-id-login').value = "";
         switchView('view-building');
+
+        // เผื่อเคยกดอนุญาตแจ้งเตือนไว้ก่อนล็อกอิน ให้ลงทะเบียน token ผูกกับรหัสนี้ทันที
+        if (notificationsEnabled && 'serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then((registration) => registerFcmToken(registration));
+        }
     }
 
     function logoutUser() {
@@ -565,6 +580,7 @@
         if (document.getElementById('admin-password').value === ADMIN_PASSWORD) {
             document.getElementById('admin-password').value = "";
             switchView('view-admin');
+            registerAdminFcmToken(); // ลงทะเบียนอุปกรณ์นี้ไว้รับแจ้งเตือน "คำขอใหม่"
         } else {
             alert("❌ รหัสผ่านไม่ถูกต้อง");
         }
@@ -623,9 +639,21 @@
     }
 
     function processRequest(reqId, newStatus) {
+        const booking = bookingsCache.find(b => b.id === reqId); // เก็บข้อมูลไว้ก่อนอัปเดต เผื่อใช้ยิง Push
         bookingsRef.child(reqId).update({ status: newStatus })
             .then(() => {
                 showToast(newStatus === 'approved' ? "✅ อนุมัติสำเร็จ!" : "❌ ไม่อนุมัติแล้ว");
+
+                // ยิง Push แจ้งเจ้าของการจองว่าผลเป็นยังไง
+                if (booking) {
+                    db.ref('fcmTokens/users/' + booking.userId).once('value').then((snap) => {
+                        const token = snap.val();
+                        if (!token) return;
+                        const title = newStatus === 'approved' ? '✅ การจองของคุณได้รับอนุมัติแล้ว' : '❌ การจองของคุณไม่ได้รับอนุมัติ';
+                        const body = `ห้อง ${booking.room} วันที่ ${booking.date} เวลา ${booking.time}`;
+                        triggerPushNotification(token, title, body);
+                    });
+                }
             })
             .catch((err) => {
                 console.error(err);
@@ -855,6 +883,14 @@
             document.getElementById('booking-reason').value = "";
             selectedTimeSlotText = "";
             document.getElementById('booking-card').classList.add('hidden-view');
+
+            // ยิง Push แจ้งแอดมินว่ามีคำขอใหม่เข้ามา
+            db.ref('fcmTokens/admin').once('value').then((snap) => {
+                const token = snap.val();
+                if (token) {
+                    triggerPushNotification(token, '📋 มีคำขอจองห้องใหม่', `ห้อง ${room} วันที่ ${selectedDate} เวลา ${selectedTimeSlotText}\nผู้จอง: ${currentUserId}`);
+                }
+            });
 
             // จองเสร็จแล้วเด้งไปหน้าประวัติการจองเพื่อให้ผู้ใช้เห็นสถานะของตัวเองทันที
             switchView('view-user-history');
