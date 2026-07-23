@@ -35,9 +35,12 @@
             <h1 class="text-lg font-bold" id="header-title">WU Room Booking</h1>
             <p class="text-[10px] text-blue-200">ระบบจองห้องเรียนล่วงหน้า</p>
         </div>
-        <div class="text-right bg-blue-800 px-3 py-1 rounded-lg border border-blue-600 shadow-inner">
-            <p class="text-[10px] text-blue-200">เวลาปัจจุบัน</p>
-            <p class="text-sm font-bold tracking-wider font-mono" id="live-clock">--:--:--</p>
+        <div class="flex items-center gap-2">
+            <button id="notify-toggle-btn" onclick="requestNotificationPermission()" class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1.5 rounded-lg shadow-sm whitespace-nowrap">🔕 เปิดแจ้งเตือน</button>
+            <div class="text-right bg-blue-800 px-3 py-1 rounded-lg border border-blue-600 shadow-inner">
+                <p class="text-[10px] text-blue-200">เวลาปัจจุบัน</p>
+                <p class="text-sm font-bold tracking-wider font-mono" id="live-clock">--:--:--</p>
+            </div>
         </div>
     </header>
 
@@ -316,7 +319,7 @@
     // ==========================================
     const OPEN_HOUR = 8;
     const CLOSE_HOUR = 20;
-    const ADMIN_PASSWORD = "A7707";
+    const ADMIN_PASSWORD = "0000";
     const MAX_ADVANCE_DAYS = 7; 
 
     // ข้อมูลตารางเรียนจาก Booking1.xlsx (อ้างอิงรายชั่วโมง; 1 = จันทร์, ..., 6 = เสาร์, 0 = อาทิตย์)
@@ -362,6 +365,7 @@
     // ==========================================
     let bookingsCache = [];        // แคชข้อมูลล่าสุดที่ sync มาจาก Firebase (อ่านแบบ sync ได้เหมือนของเดิม)
     let firebaseReady = false;
+    let lastKnownStatusById = null; // ใช้เทียบว่ามีอะไรเปลี่ยนไปบ้างระหว่างการ sync แต่ละรอบ (สำหรับแจ้งเตือน)
 
     function loadBookings() {
         // ฟังก์ชันนี้ยังคงชื่อ/พฤติกรรมเดิมไว้ เพื่อไม่ต้องแก้โค้ดจุดอื่นที่เรียกใช้อยู่
@@ -372,7 +376,30 @@
         bookingsRef.on('value', (snapshot) => {
             const data = snapshot.val() || {};
             // Firebase เก็บเป็น object ที่ key คือ id ที่สุ่มมาให้ ต้องแปลงกลับเป็น array
-            bookingsCache = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+            const newCache = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+
+            // ตรวจจับการเปลี่ยนแปลงเพื่อยิง Notification (ข้าม sync รอบแรกสุด กันแจ้งเตือนย้อนหลังข้อมูลเก่า)
+            if (lastKnownStatusById !== null) {
+                newCache.forEach(b => {
+                    const prevStatus = lastKnownStatusById[b.id];
+                    // มีคำขอจองใหม่เข้ามา -> แจ้งเตือนฝั่งแอดมิน
+                    if (prevStatus === undefined && b.status === 'pending') {
+                        fireNativeNotification('📋 มีคำขอจองห้องใหม่', `ห้อง ${b.room} วันที่ ${b.date} เวลา ${b.time}\nผู้จอง: ${b.userId}`);
+                    }
+                    // สถานะการจองของ "ตัวเอง" เปลี่ยนไป -> แจ้งเตือนฝั่งผู้ใช้
+                    if (prevStatus && prevStatus !== b.status && b.userId === currentUserId) {
+                        if (b.status === 'approved') {
+                            fireNativeNotification('✅ การจองของคุณได้รับอนุมัติแล้ว', `ห้อง ${b.room} วันที่ ${b.date} เวลา ${b.time}`);
+                        } else if (b.status === 'rejected') {
+                            fireNativeNotification('❌ การจองของคุณไม่ได้รับอนุมัติ', `ห้อง ${b.room} วันที่ ${b.date} เวลา ${b.time}`);
+                        }
+                    }
+                });
+            }
+            lastKnownStatusById = {};
+            newCache.forEach(b => { lastKnownStatusById[b.id] = b.status; });
+
+            bookingsCache = newCache;
             firebaseReady = true;
             refreshCurrentViews();
         }, (error) => {
@@ -387,6 +414,68 @@
             generateTimeSlots(selectedRoomName, selectedDate);
         }
         if (!document.getElementById('view-user-history').classList.contains('hidden-view')) renderUserHistory();
+    }
+
+    // ==========================================
+    // 1.1 ระบบแจ้งเตือนผ่านเบราว์เซอร์ (Web Notification)
+    // หมายเหตุ: ทำงานได้ตราบใดที่ "แท็บ/หน้าต่างนี้ยังเปิดอยู่" (จะย่อหน้าต่างหรือสลับไปแท็บอื่นได้)
+    // แต่ถ้าปิดเบราว์เซอร์ไปเลยจะไม่ได้รับแจ้งเตือน เพราะระบบนี้ไม่มีเซิร์ฟเวอร์ฝั่งหลังบ้านคอยส่ง Push จริง
+    // ==========================================
+    let notificationsEnabled = false;
+
+    function initNotifications() {
+        if (!('Notification' in window)) return; // เบราว์เซอร์เก่าบางตัวไม่รองรับ ข้ามไปเงียบๆ
+        notificationsEnabled = Notification.permission === 'granted';
+        updateNotifyButtonUI();
+    }
+
+    function requestNotificationPermission() {
+        if (!('Notification' in window)) {
+            alert("😕 เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนครับ");
+            return;
+        }
+        if (Notification.permission === 'denied') {
+            alert("🔒 คุณเคยปิดกั้นการแจ้งเตือนของเว็บนี้ไว้ครับ\nต้องไปเปิดเองที่ตั้งค่าเบราว์เซอร์ (กดไอคอนกุญแจ/ตั้งค่า ข้าง URL แถบที่อยู่ > อนุญาตการแจ้งเตือน) แล้วรีเฟรชหน้านี้ใหม่");
+            return;
+        }
+        Notification.requestPermission().then(permission => {
+            notificationsEnabled = permission === 'granted';
+            updateNotifyButtonUI();
+            if (notificationsEnabled) {
+                showToast("🔔 เปิดการแจ้งเตือนสำเร็จ!");
+                new Notification('WU Room Booking', { body: 'เปิดใช้งานการแจ้งเตือนเรียบร้อยแล้ว ✅ ทิ้งแท็บนี้ไว้เพื่อรับแจ้งเตือน' });
+            } else {
+                showToast("⚠️ คุณไม่ได้อนุญาตการแจ้งเตือน");
+            }
+        });
+    }
+
+    function updateNotifyButtonUI() {
+        const btn = document.getElementById('notify-toggle-btn');
+        if (!btn) return;
+        if (notificationsEnabled) {
+            btn.innerText = "🔔 แจ้งเตือนเปิดอยู่";
+            btn.className = "bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1.5 rounded-lg shadow-sm whitespace-nowrap";
+        } else {
+            btn.innerText = "🔕 เปิดแจ้งเตือน";
+            btn.className = "bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1.5 rounded-lg shadow-sm whitespace-nowrap";
+        }
+    }
+
+    // ยิง Notification จริง (เรียกจากตัวตรวจจับความเปลี่ยนแปลงใน initFirebaseSync)
+    function fireNativeNotification(title, body) {
+        if (!notificationsEnabled) return;
+        // ถ้าแท็บนี้กำลังเปิดดูอยู่พอดี ไม่ต้องเด้ง Notification ซ้อน (มี toast/หน้าจอ refresh ให้เห็นอยู่แล้ว)
+        if (document.visibilityState === 'visible' && document.hasFocus()) return;
+        try {
+            const n = new Notification(title, {
+                body: body,
+                icon: 'https://cdn-icons-png.flaticon.com/512/3048/3048122.png'
+            });
+            n.onclick = () => { window.focus(); n.close(); };
+        } catch (e) {
+            console.error("Notification error:", e);
+        }
     }
 
     // ==========================================
@@ -793,6 +882,7 @@
     initFirebaseSync();
     updateClock();
     initDatePicker();
+    initNotifications();
 </script>
 </body>
 </html>
