@@ -19,6 +19,7 @@
     .slot-class { background-color: #fee2e2; color: #991b1b; border: 1px solid #ef4444; opacity: 0.8; cursor: pointer; }
     .slot-booked { background-color: #fef3c7; color: #92400e; border: 1px solid #f59e0b; opacity: 0.85; cursor: pointer; }
     .slot-pending { background-color: #ede9fe; color: #5b21b6; border: 1px solid #8b5cf6; opacity: 0.9; cursor: pointer; }
+    .slot-party { background-color: #cffafe; color: #155e75; border: 1px solid #06b6d4; opacity: 0.95; cursor: pointer; }
     .slot-past { background-color: #f3f4f6; color: #9ca3af; border: 1px dashed #d1d5db; cursor: not-allowed; }
     .toast { animation: fadein 0.25s ease, fadeout 0.25s ease 2.3s; }
     @keyframes fadein { from{opacity:0; transform: translate(-50%,10px);} to{opacity:1; transform: translate(-50%,0);} }
@@ -117,10 +118,19 @@
                 <button onclick="logoutUser()" class="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full font-bold hover:bg-red-200 transition">ออกจากระบบ</button>
             </div>
             
-            <button onclick="switchView('view-user-history')" class="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 p-3 rounded-lg shadow-sm font-bold mb-5 flex justify-between items-center hover:bg-indigo-100 transition">
+            <button onclick="switchView('view-user-history')" class="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 p-3 rounded-lg shadow-sm font-bold mb-3 flex justify-between items-center hover:bg-indigo-100 transition">
                 📋 ประวัติและสถานะการจองของฉัน
                 <span class="text-xl">➔</span>
             </button>
+
+            <!-- 🔑 กรอกรหัสเข้าร่วมปาร์ตี้ห้อง -->
+            <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-3 mb-5">
+                <p class="text-xs font-bold text-cyan-800 mb-2">🔑 มีรหัสเข้าห้องอยู่แล้ว? กรอกที่นี่ได้เลย</p>
+                <div class="flex gap-2">
+                    <input type="text" id="join-code-input" maxlength="6" placeholder="กรอกรหัส 6 หลัก" class="flex-1 p-2 border border-cyan-300 rounded-lg text-sm text-center tracking-widest uppercase font-bold" oninput="this.value = this.value.toUpperCase()">
+                    <button onclick="joinPartyByCode(document.getElementById('join-code-input').value)" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 rounded-lg text-sm font-bold whitespace-nowrap">เข้าร่วม</button>
+                </div>
+            </div>
 
             <h2 class="text-lg font-bold text-gray-800 mb-4">🏢 เลือกอาคารที่ต้องการจอง</h2>
             <div class="space-y-3">
@@ -314,6 +324,47 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- VIEW 8: หน้าห้องปาร์ตี้ (รหัสเข้าร่วม, สมาชิก, ยกเลิก/ออกจากห้อง) -->
+        <!-- ========================================== -->
+        <div id="view-party-room" class="hidden-view flex-1">
+            <button onclick="switchView('view-user-history')" class="mb-3 text-sm text-blue-600 font-bold flex items-center gap-1">← กลับหน้าประวัติ</button>
+
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden mb-4">
+                <div class="bg-gradient-to-r from-cyan-600 to-blue-600 text-white p-4">
+                    <p class="text-xs text-cyan-100">ห้อง</p>
+                    <h2 class="text-xl font-bold" id="party-room-title">NGxxxx</h2>
+                    <p class="text-xs text-cyan-100 mt-1" id="party-room-datetime">-</p>
+                </div>
+
+                <div class="p-4">
+                    <p class="text-xs font-bold text-gray-500 mb-1 text-center">🔑 รหัสเข้าร่วมห้องนี้ (แชร์ให้เพื่อนได้เลย)</p>
+                    <div class="flex items-center gap-2 justify-center mb-4">
+                        <p id="party-room-code" class="text-3xl font-black tracking-[0.3em] text-cyan-700">------</p>
+                        <button onclick="copyPartyCode()" class="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-2 py-1.5 rounded-lg">📋 คัดลอก</button>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="flex justify-between text-xs font-bold text-gray-600 mb-1">
+                            <span>👥 สมาชิกในห้อง</span>
+                            <span id="party-room-capacity-label">0 / 30 คน</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="party-room-capacity-bar" class="bg-cyan-500 h-2.5 rounded-full transition-all" style="width:0%"></div>
+                        </div>
+                    </div>
+
+                    <div id="party-room-members" class="space-y-1.5 max-h-52 overflow-y-auto mb-4 border-t border-b border-gray-100 py-2">
+                        <!-- รายชื่อสมาชิกสร้างด้วย JavaScript -->
+                    </div>
+
+                    <p id="party-room-status-note" class="text-xs text-center text-gray-500 mb-3"></p>
+
+                    <div id="party-room-actions"></div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- Toast แจ้งเตือนแบบลอย -->
@@ -336,6 +387,8 @@
     let selectedRoomName = "";
     let selectedDate = todayStr();
     let currentAdminTab = "pending";
+    let currentPartyBookingId = null; // booking id ของห้องปาร์ตี้ที่กำลังเปิดดูอยู่
+    const ROOM_CAPACITY = 30; // ทุกห้องรับได้สูงสุด 30 คนต่อปาร์ตี้
     
     // ดึงประวัติล็อกอินของผู้ใช้งาน (เก็บเฉพาะเครื่อง ไม่ต้อง sync ข้ามอุปกรณ์)
     let currentUserId = localStorage.getItem('wu_current_user_id') || "";
@@ -396,6 +449,9 @@
             generateTimeSlots(selectedRoomName, selectedDate);
         }
         if (!document.getElementById('view-user-history').classList.contains('hidden-view')) renderUserHistory();
+        if (!document.getElementById('view-party-room').classList.contains('hidden-view') && currentPartyBookingId) {
+            renderPartyRoom(currentPartyBookingId);
+        }
     }
 
     // ==========================================
@@ -526,7 +582,7 @@
     // 3. ระบบนำทาง (Navigation) & ระบบผู้ใช้งาน
     // ==========================================
     function switchView(viewId) {
-        ['view-role', 'view-login', 'view-admin', 'view-user-login', 'view-building', 'view-map', 'view-user-history'].forEach(id => {
+        ['view-role', 'view-login', 'view-admin', 'view-user-login', 'view-building', 'view-map', 'view-user-history', 'view-party-room'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.classList.add('hidden-view');
         });
@@ -535,6 +591,7 @@
         if (viewId === 'view-admin') headerTitle.innerText = "Admin Dashboard";
         else if (viewId === 'view-login') headerTitle.innerText = "Admin Login";
         else if (viewId === 'view-user-login') headerTitle.innerText = "User Login";
+        else if (viewId === 'view-party-room') headerTitle.innerText = "ห้องปาร์ตี้";
         else headerTitle.innerText = "WU Room Booking";
 
         document.getElementById(viewId).classList.remove('hidden-view');
@@ -631,8 +688,9 @@
                     <span class="bg-purple-100 text-purple-800 text-xs font-bold px-2 py-1 rounded">⏱️ ${b.time}</span>
                     ${statusBadge(b.status)}
                 </div>
-                <p class="text-sm font-bold text-gray-700 mt-2">รหัสผู้จอง: ${b.userId}</p>
+                <p class="text-sm font-bold text-gray-700 mt-2">รหัสผู้จอง (เจ้าของห้อง): ${b.userId}</p>
                 <p class="text-sm text-gray-600 mt-1">เหตุผล: ${b.reason}</p>
+                ${b.partyCode ? `<p class="text-[11px] text-cyan-700 font-bold mt-1">👥 สมาชิก ${(b.members || []).length}/${b.capacity || ROOM_CAPACITY} คน &nbsp;|&nbsp; 🔑 รหัส: ${b.partyCode}</p>` : ''}
                 ${b.status === 'pending' ? `
                 <div class="flex gap-2 mt-4">
                     <button onclick="processRequest('${b.id}', 'approved')" class="flex-1 bg-green-500 text-white py-2 rounded text-sm font-bold hover:bg-green-600">✅ อนุมัติ</button>
@@ -667,7 +725,7 @@
     }
 
     // ==========================================
-    // 4.1 ระบบจำกัด "1 คน จองได้แค่ 1 ห้อง" ในช่วงเวลาเดียวกัน
+    // 4.1 ระบบจำกัด "1 คน จองได้แค่ 1 ห้อง" ในช่วงเวลาเดียวกัน (นับรวมการเป็นสมาชิกปาร์ตี้ห้องอื่นด้วย)
     // ==========================================
     // เช็คว่าการจองรายการนี้ "ยังไม่หมดเวลา" อยู่หรือไม่ (นับเฉพาะ pending/approved)
     function isBookingActive(b) {
@@ -680,18 +738,46 @@
         return new Date().getHours() < endHour;
     }
 
-    // หาการจองที่ "ยังใช้งานอยู่" ของผู้ใช้คนนี้ (ถ้ามี คือคนนี้จองห้องไว้แล้วยังไม่หมดเวลา)
-    function getUserActiveBooking(userId) {
-        const bookings = loadBookings() || [];
-        return bookings.find(b => b.userId === userId && isBookingActive(b));
+    // เช็คว่า userId คนนี้ "เกี่ยวข้อง" กับการจองนี้หรือไม่ ไม่ว่าจะเป็นเจ้าของห้องหรือแค่สมาชิกปาร์ตี้
+    function isUserInBooking(b, userId) {
+        if (b.userId === userId) return true;
+        const members = b.members || [];
+        return members.some(m => m.userId === userId);
     }
 
-    // ผู้ใช้กดยกเลิกการจองของตัวเอง
+    // หาการจองที่ "ยังใช้งานอยู่" ของผู้ใช้คนนี้ (เจ้าของห้อง หรือ สมาชิกปาร์ตี้ก็นับ)
+    function getUserActiveBooking(userId) {
+        const bookings = loadBookings() || [];
+        return bookings.find(b => isUserInBooking(b, userId) && isBookingActive(b));
+    }
+
+    // เจ้าของห้องกดยกเลิก -> สมาชิกทุกคนถูกดีดออกอัตโนมัติ (เพราะ isBookingActive จะกลายเป็น false ทันทีที่สถานะเปลี่ยน)
     function cancelBooking(bookingId) {
-        if (!confirm("ยืนยันยกเลิกการจองนี้หรือไม่?\n(ห้องจะว่างให้คนอื่นจองได้ทันที)")) return;
+        const booking = bookingsCache.find(b => b.id === bookingId);
+        const confirmMsg = (booking && (booking.members || []).length > 1)
+            ? `ยืนยันยกเลิกห้องนี้หรือไม่?\n⚠️ มีสมาชิกร่วมอยู่ ${booking.members.length} คน ทุกคนจะถูกดีดออกจากห้องทันที`
+            : "ยืนยันยกเลิกการจองนี้หรือไม่?\n(ห้องจะว่างให้คนอื่นจองได้ทันที)";
+        if (!confirm(confirmMsg)) return;
+
         bookingsRef.child(bookingId).update({ status: 'cancelled' })
             .then(() => {
                 showToast("✅ ยกเลิกการจองเรียบร้อยแล้ว");
+                // แจ้งเตือนสมาชิกทุกคน (ไม่รวมเจ้าของ) ว่าถูกดีดออกจากห้อง
+                if (booking) {
+                    const members = booking.members || [];
+                    members.forEach(m => {
+                        if (m.userId === booking.userId) return; // ข้ามเจ้าของห้อง
+                        db.ref('fcmTokens/users/' + m.userId).once('value').then((snap) => {
+                            const token = snap.val();
+                            if (token) triggerPushNotification(token, '🚫 ห้องปาร์ตี้ถูกยกเลิก', `ห้อง ${booking.room} วันที่ ${booking.date} เวลา ${booking.time} ถูกเจ้าของห้องยกเลิกแล้ว`);
+                        });
+                    });
+                }
+                // ถ้ากำลังเปิดดูห้องนี้อยู่พอดี ให้เด้งกลับไปหน้าประวัติทันที
+                if (currentPartyBookingId === bookingId) {
+                    currentPartyBookingId = null;
+                    switchView('view-user-history');
+                }
             })
             .catch((err) => {
                 console.error(err);
@@ -699,9 +785,164 @@
             });
     }
 
+    // สมาชิก (ไม่ใช่เจ้าของ) กดออกจากห้องเอง
+    function leaveParty(bookingId) {
+        if (!confirm("ยืนยันออกจากห้องนี้หรือไม่?")) return;
+        bookingsRef.child(bookingId).child('members').transaction((currentMembers) => {
+            currentMembers = currentMembers || [];
+            return currentMembers.filter(m => m.userId !== currentUserId);
+        }, (error, committed) => {
+            if (error || !committed) {
+                showToast("⚠️ ออกจากห้องไม่สำเร็จ ลองใหม่อีกครั้ง");
+                return;
+            }
+            showToast("👋 ออกจากห้องเรียบร้อยแล้ว");
+            currentPartyBookingId = null;
+            switchView('view-user-history');
+        });
+    }
+
+    // ==========================================
+    // 4.2 ระบบห้องปาร์ตี้ (Party Booking) — รหัสเข้าร่วม, สมาชิกสูงสุด 30 คน
+    // ==========================================
+    function generatePartyCode() {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // ตัดตัวที่สับสนง่ายออก (0/O, 1/I/L)
+        let code = "";
+        for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+        return code;
+    }
+
+    function generateUniquePartyCode() {
+        let code;
+        let attempts = 0;
+        do {
+            code = generatePartyCode();
+            attempts++;
+        } while (attempts < 20 && bookingsCache.some(b => b.partyCode === code && b.status !== 'rejected' && b.status !== 'cancelled'));
+        return code;
+    }
+
+    // เปิดหน้าห้องปาร์ตี้ (ใช้ทั้งตอนจองสำเร็จ, กดเข้าร่วมด้วยรหัส, และกดจากหน้าประวัติ)
+    // fallbackBooking: ใช้ตอนเพิ่งสร้างห้องเสร็จใหม่ๆ เผื่อ bookingsCache จาก listener ยังไม่มาถึง (กัน race condition)
+    function openPartyRoom(bookingId, fallbackBooking) {
+        currentPartyBookingId = bookingId;
+        switchView('view-party-room');
+        renderPartyRoom(bookingId, fallbackBooking);
+    }
+
+    function renderPartyRoom(bookingId, fallbackBooking) {
+        const booking = bookingsCache.find(b => b.id === bookingId) || (fallbackBooking ? { id: bookingId, ...fallbackBooking } : null);
+        if (!booking) {
+            showToast("⚠️ ไม่พบข้อมูลห้องนี้แล้ว");
+            switchView('view-user-history');
+            return;
+        }
+
+        // ถ้าห้องถูกยกเลิก/ไม่อนุมัติ/หมดเวลาไปแล้วระหว่างที่เปิดหน้านี้ค้างไว้ -> ดีดออกอัตโนมัติ
+        if (!isBookingActive(booking)) {
+            currentPartyBookingId = null;
+            if (booking.status === 'cancelled') {
+                alert("🚫 ห้องนี้ถูกเจ้าของห้องยกเลิกแล้ว คุณถูกนำออกจากห้อง");
+            }
+            switchView('view-user-history');
+            return;
+        }
+
+        const members = booking.members || [];
+        const capacity = booking.capacity || ROOM_CAPACITY;
+        const isOwner = booking.userId === currentUserId;
+        const percent = Math.min(100, Math.round((members.length / capacity) * 100));
+
+        document.getElementById('party-room-title').innerText = booking.room;
+        document.getElementById('party-room-datetime').innerText = `📅 ${booking.date}  |  ⏱️ ${booking.time}`;
+        document.getElementById('party-room-code').innerText = booking.partyCode || '------';
+        document.getElementById('party-room-capacity-label').innerText = `${members.length} / ${capacity} คน`;
+        document.getElementById('party-room-capacity-bar').style.width = percent + '%';
+
+        const membersBox = document.getElementById('party-room-members');
+        membersBox.innerHTML = members.map(m => `
+            <div class="flex items-center justify-between text-sm py-1 px-2 rounded ${m.userId === currentUserId ? 'bg-cyan-50 font-bold' : ''}">
+                <span>👤 ${m.userId} ${m.userId === booking.userId ? '<span class="text-[10px] text-amber-600 font-bold">(เจ้าของห้อง)</span>' : ''}</span>
+                ${m.userId === currentUserId ? '<span class="text-[10px] text-cyan-600">คุณ</span>' : ''}
+            </div>
+        `).join('') || '<p class="text-xs text-gray-400 text-center py-2">ยังไม่มีสมาชิก</p>';
+
+        const statusNote = booking.status === 'pending'
+            ? "⏳ การจองนี้กำลังรอแอดมินอนุมัติอยู่"
+            : "✅ การจองนี้ได้รับอนุมัติแล้ว";
+        document.getElementById('party-room-status-note').innerText = statusNote;
+
+        const actionsBox = document.getElementById('party-room-actions');
+        if (isOwner) {
+            actionsBox.innerHTML = `<button onclick="cancelBooking('${booking.id}')" class="w-full bg-red-50 border border-red-300 text-red-600 py-2.5 rounded-lg text-sm font-bold hover:bg-red-100">❌ ยกเลิกห้องนี้ (สมาชิกทุกคนจะถูกดีดออก)</button>`;
+        } else {
+            actionsBox.innerHTML = `<button onclick="leaveParty('${booking.id}')" class="w-full bg-gray-100 border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-200">🚪 ออกจากห้อง</button>`;
+        }
+    }
+
+    function copyPartyCode() {
+        const code = document.getElementById('party-room-code').innerText;
+        if (!code || code === '------') return;
+        navigator.clipboard.writeText(code).then(() => {
+            showToast("📋 คัดลอกรหัสแล้ว!");
+        }).catch(() => {
+            showToast("⚠️ คัดลอกไม่สำเร็จ กรุณาคัดลอกด้วยตัวเอง");
+        });
+    }
+
+    // เข้าร่วมปาร์ตี้ด้วยรหัส (ใช้ currentUserId ที่ล็อกอินอยู่แล้วโดยอัตโนมัติ ไม่ต้องกรอกซ้ำ)
+    function joinPartyByCode(rawCode) {
+        const code = (rawCode || "").trim().toUpperCase();
+        if (!code) return alert("⚠️ กรุณากรอกรหัสห้องก่อนครับ");
+
+        const booking = bookingsCache.find(b => b.partyCode === code && (b.status === 'approved' || b.status === 'pending'));
+        if (!booking) return alert("😕 ไม่พบห้องที่ใช้รหัสนี้ครับ (รหัสอาจผิด หรือห้องถูกยกเลิก/หมดเวลาไปแล้ว)");
+
+        if (booking.status === 'pending') return alert("⏳ ห้องนี้กำลังรอแอดมินอนุมัติอยู่ ยังเข้าร่วมไม่ได้ในตอนนี้ครับ ลองใหม่อีกครั้งภายหลัง");
+        if (!isBookingActive(booking)) return alert("⌛ ห้องนี้หมดเวลาการใช้งานไปแล้วครับ");
+
+        // ถ้าเป็นสมาชิกอยู่แล้ว (หรือเป็นเจ้าของเอง) ก็แค่พาเข้าไปดูห้องเลย ไม่ต้อง join ซ้ำ
+        if (isUserInBooking(booking, currentUserId)) {
+            document.getElementById('join-code-input') && (document.getElementById('join-code-input').value = "");
+            openPartyRoom(booking.id);
+            return;
+        }
+
+        // เช็คโควต้า "1 คน 1 ห้อง" ก่อนให้เข้าร่วมห้องใหม่
+        const activeBooking = getUserActiveBooking(currentUserId);
+        if (activeBooking) {
+            alert(`⚠️ คุณอยู่ในห้อง/ปาร์ตี้อื่นอยู่แล้ว!\n\nห้อง: ${activeBooking.room}\nวันที่: ${activeBooking.date}\nเวลา: ${activeBooking.time}\n\nกรุณารอให้ครบกำหนดเวลาเดิมก่อน หรือออกจากห้องเดิมก่อน จึงจะเข้าร่วมห้องใหม่ได้`);
+            return;
+        }
+
+        const capacity = booking.capacity || ROOM_CAPACITY;
+        bookingsRef.child(booking.id).child('members').transaction((currentMembers) => {
+            currentMembers = currentMembers || [];
+            if (currentMembers.length >= capacity) return; // undefined = ยกเลิก transaction (เต็มพอดี)
+            if (currentMembers.some(m => m.userId === currentUserId)) return currentMembers;
+            currentMembers.push({ userId: currentUserId, joinedAt: Date.now() });
+            return currentMembers;
+        }, (error, committed) => {
+            if (error) {
+                console.error(error);
+                showToast("⚠️ เข้าร่วมไม่สำเร็จ ลองใหม่อีกครั้ง");
+                return;
+            }
+            if (!committed) {
+                alert("😢 ห้องนี้เต็มพอดีเลยครับ (30/30 คน) ลองหาห้องอื่นดูนะครับ");
+                return;
+            }
+            const input = document.getElementById('join-code-input');
+            if (input) input.value = "";
+            showToast("🎉 เข้าร่วมห้องสำเร็จ!");
+            openPartyRoom(booking.id);
+        });
+    }
+
     function renderUserHistory() {
         const bookings = loadBookings() || [];
-        const myBookings = bookings.filter(b => b.userId === currentUserId).sort((a,b) => b.createdAt - a.createdAt);
+        // แสดงทั้งห้องที่ตัวเองเป็นเจ้าของ และห้องที่เข้าร่วมเป็นสมาชิกปาร์ตี้คนอื่น
+        const myBookings = bookings.filter(b => isUserInBooking(b, currentUserId)).sort((a,b) => b.createdAt - a.createdAt);
         
         const container = document.getElementById('user-history-container');
         const emptyMsg = document.getElementById('user-history-empty');
@@ -715,19 +956,21 @@
         
         myBookings.forEach(b => {
             const borderColor = b.status === 'approved' ? 'border-green-400' : b.status === 'rejected' ? 'border-red-400' : b.status === 'cancelled' ? 'border-gray-400' : 'border-yellow-400';
-            const canCancel = isBookingActive(b); // ยกเลิกได้เฉพาะรายการที่ pending/approved และยังไม่หมดเวลา
+            const isOwner = b.userId === currentUserId;
+            const canEnterRoom = isBookingActive(b); // เข้าห้องปาร์ตี้ได้เฉพาะรายการที่ pending/approved และยังไม่หมดเวลา
             const card = document.createElement('div');
             card.className = `bg-white p-4 rounded-lg shadow-sm border-l-4 ${borderColor}`;
             card.innerHTML = `
                 <div class="flex justify-between items-start mb-2">
                     <div>
-                        <p class="font-bold text-gray-800 text-sm mb-1">ห้อง: ${b.room}</p>
+                        <p class="font-bold text-gray-800 text-sm mb-1">ห้อง: ${b.room} <span class="text-[10px] font-normal text-gray-400">${isOwner ? '(เจ้าของห้อง)' : '(สมาชิก)'}</span></p>
                         <p class="text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block">📅 ${b.date} | ⏱️ ${b.time}</p>
                     </div>
                     ${statusBadge(b.status)}
                 </div>
                 <p class="text-sm text-gray-600 border-t pt-2 mt-2">เหตุผล: ${b.reason}</p>
-                ${canCancel ? `<button onclick="cancelBooking('${b.id}')" class="w-full mt-3 bg-red-50 border border-red-300 text-red-600 py-2 rounded-lg text-xs font-bold hover:bg-red-100">🚫 ยกเลิกการจองนี้</button>` : ''}
+                ${b.partyCode ? `<p class="text-[11px] text-cyan-700 font-bold mt-1">👥 ${(b.members || []).length}/${b.capacity || ROOM_CAPACITY} คน</p>` : ''}
+                ${canEnterRoom ? `<button onclick="openPartyRoom('${b.id}')" class="w-full mt-3 bg-cyan-50 border border-cyan-300 text-cyan-700 py-2 rounded-lg text-xs font-bold hover:bg-cyan-100">🔑 เข้าห้องปาร์ตี้</button>` : ''}
             `;
             container.appendChild(card);
         });
@@ -761,7 +1004,7 @@
             // เตือนทันทีถ้ามีการจองที่ยังไม่หมดเวลาอยู่แล้ว จะได้ไม่เสียเวลาเลือกช่วงเวลา
             const activeBooking = getUserActiveBooking(currentUserId);
             if (activeBooking) {
-                alert(`⚠️ คุณได้จองห้องไปแล้ว!\n\nห้อง: ${activeBooking.room}\nวันที่: ${activeBooking.date}\nเวลา: ${activeBooking.time}\nสถานะ: ${activeBooking.status === 'approved' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}\n\nกรุณารอให้ครบกำหนดเวลาเดิมก่อน หรือไปยกเลิกการจองเดิมที่หน้า "ประวัติการจองของฉัน" จึงจะจองห้องใหม่ได้`);
+                alert(`⚠️ คุณอยู่ในห้อง/ปาร์ตี้อื่นอยู่แล้ว!\n\nห้อง: ${activeBooking.room}\nวันที่: ${activeBooking.date}\nเวลา: ${activeBooking.time}\nสถานะ: ${activeBooking.status === 'approved' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}\n\nกรุณารอให้ครบกำหนดเวลาเดิมก่อน หรือไปออกจากห้องเดิมที่หน้า "ประวัติการจองของฉัน" จึงจะจองห้องใหม่ได้`);
                 return;
             }
 
@@ -816,14 +1059,20 @@
 
             const existing = bookings.find(b => b.room === roomName && b.date === dateStr && b.time === timeText && b.status !== 'rejected' && b.status !== 'cancelled');
             if (existing) {
-                if (existing.status === 'approved') {
+                const memberCount = (existing.members || []).length;
+                const capacity = existing.capacity || ROOM_CAPACITY;
+                if (existing.status === 'approved' && memberCount < capacity) {
+                    // ปาร์ตี้ที่อนุมัติแล้วและยังไม่เต็ม -> ร่วมได้ด้วยรหัส
+                    btn.classList.add('slot-party');
+                    btn.innerHTML = `${timeText}<br><span class="text-[9px] font-normal">🎉 ร่วมได้ (${memberCount}/${capacity})</span>`;
+                } else if (existing.status === 'approved') {
                     btn.classList.add('slot-booked');
-                    btn.innerHTML = `${timeText}<br><span class="text-[9px] font-normal">จองแล้ว</span>`;
+                    btn.innerHTML = `${timeText}<br><span class="text-[9px] font-normal">เต็มแล้ว (${memberCount}/${capacity})</span>`;
                 } else {
                     btn.classList.add('slot-pending');
                     btn.innerHTML = `${timeText}<br><span class="text-[9px] font-normal">รออนุมัติ</span>`;
                 }
-                // ไม่ disabled แล้ว เพราะให้กดเพื่อดู "ห้องทางเลือก" ที่ว่างช่วงเดียวกันแทน
+                // ไม่ disabled แล้ว เพราะให้กดเพื่อดู "ห้องทางเลือก"/เข้าร่วมปาร์ตี้ ที่ว่างช่วงเดียวกันแทน
                 btn.onclick = () => showRoomSuggestions(dateStr, i, timeText);
                 grid.appendChild(btn);
                 continue;
@@ -868,19 +1117,43 @@
     }
 
     function showRoomSuggestions(dateStr, hour, timeText) {
+        const bookings = loadBookings() || [];
+        const existing = bookings.find(b => b.room === selectedRoomName && b.date === dateStr && b.time === timeText && b.status !== 'rejected' && b.status !== 'cancelled');
         const alternatives = findAvailableRoomsForSlot(dateStr, hour, selectedRoomName);
         const box = document.getElementById('room-suggestion-box');
 
+        let partySection = "";
+        if (existing) {
+            const memberCount = (existing.members || []).length;
+            const capacity = existing.capacity || ROOM_CAPACITY;
+            if (existing.status === 'approved' && memberCount < capacity) {
+                partySection = `
+                    <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-3 mb-3">
+                        <p class="text-xs font-bold text-cyan-800 mb-2">🎉 ห้องนี้กำลังมีปาร์ตี้อยู่ (${memberCount}/${capacity} คน) ยังร่วมได้! มีรหัสมั้ย?</p>
+                        <div class="flex gap-2">
+                            <input type="text" id="inline-join-code" maxlength="6" placeholder="กรอกรหัส 6 หลัก" class="flex-1 p-2 border border-cyan-300 rounded-lg text-sm text-center tracking-widest uppercase font-bold" oninput="this.value = this.value.toUpperCase()">
+                            <button onclick="joinPartyByCode(document.getElementById('inline-join-code').value)" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 rounded-lg text-sm font-bold whitespace-nowrap">เข้าร่วม</button>
+                        </div>
+                    </div>`;
+            } else if (existing.status === 'approved') {
+                partySection = `<p class="text-xs text-amber-700 font-bold mb-3 text-center">😢 ห้องนี้เต็มแล้ว (${memberCount}/${capacity} คน) เข้าร่วมเพิ่มไม่ได้แล้วครับ</p>`;
+            } else if (existing.status === 'pending') {
+                partySection = `<p class="text-xs text-purple-700 font-bold mb-3 text-center">⏳ ห้องนี้กำลังรอแอดมินอนุมัติอยู่ ยังเข้าร่วมไม่ได้ในตอนนี้ครับ</p>`;
+            }
+        }
+
+        let altSection = "";
         if (alternatives.length === 0) {
-            box.innerHTML = `<p class="text-xs text-gray-500 text-center py-1">😢 ช่วงเวลา ${timeText} ห้องอื่นก็เต็ม/มีเรียนหมดเหมือนกัน ลองเลือกเวลาอื่นดูนะครับ</p>`;
+            altSection = `<p class="text-xs text-gray-500 text-center py-1">😢 ช่วงเวลา ${timeText} ห้องอื่นก็เต็ม/มีเรียนหมดเหมือนกัน ลองเลือกเวลาอื่นดูนะครับ</p>`;
         } else {
-            box.innerHTML = `
-                <p class="text-xs font-bold text-blue-700 mb-2">💡 ห้อง ${selectedRoomName} ไม่ว่างช่วง ${timeText} แต่ห้องอื่นว่างอยู่ ลองดูนี่แทนไหม?</p>
+            altSection = `
+                <p class="text-xs font-bold text-blue-700 mb-2">💡 หรือลองห้องอื่นที่ว่างช่วง ${timeText} แทนไหม?</p>
                 <div class="flex flex-wrap gap-2">
                     ${alternatives.map(r => `<button onclick="jumpToRoom('${r}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">🚪 ${r}</button>`).join('')}
-                </div>
-            `;
+                </div>`;
         }
+
+        box.innerHTML = partySection + altSection;
         box.classList.remove('hidden-view');
         box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
@@ -919,25 +1192,27 @@
         // 🔒 1 คน จองได้แค่ 1 ห้องในช่วงเวลาเดียวกัน ถ้ามีการจองที่ยังไม่หมดเวลาอยู่ ห้ามจองซ้ำ
         const activeBooking = getUserActiveBooking(currentUserId);
         if (activeBooking) {
-            alert(`⚠️ คุณได้จองห้องไปแล้ว!\n\nห้อง: ${activeBooking.room}\nวันที่: ${activeBooking.date}\nเวลา: ${activeBooking.time}\nสถานะ: ${activeBooking.status === 'approved' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}\n\nกรุณารอให้ครบกำหนดเวลาเดิมก่อน หรือไปยกเลิกการจองเดิมที่หน้า "ประวัติการจองของฉัน" จึงจะจองห้องใหม่ได้`);
+            alert(`⚠️ คุณอยู่ในห้อง/ปาร์ตี้อื่นอยู่แล้ว!\n\nห้อง: ${activeBooking.room}\nวันที่: ${activeBooking.date}\nเวลา: ${activeBooking.time}\nสถานะ: ${activeBooking.status === 'approved' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}\n\nกรุณารอให้ครบกำหนดเวลาเดิมก่อน หรือไปออกจากห้องเดิมที่หน้า "ประวัติการจองของฉัน" จึงจะจองห้องใหม่ได้`);
             return;
         }
 
+        const partyCode = generateUniquePartyCode();
         const newBooking = {
             room: room,
             date: selectedDate,
             time: selectedTimeSlotText,
-            userId: currentUserId, // ใช้รหัสผู้ใช้ที่จำไว้ตั้งแต่ตอนล็อกอิน
+            userId: currentUserId, // ใช้รหัสผู้ใช้ที่จำไว้ตั้งแต่ตอนล็อกอิน = เจ้าของห้อง
             reason: reason,
             status: "pending",
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            partyCode: partyCode,
+            capacity: ROOM_CAPACITY,
+            members: [{ userId: currentUserId, joinedAt: Date.now() }] // เจ้าของห้องนับเป็นสมาชิกคนแรกอัตโนมัติ
         };
 
-        // push() จะสร้าง id ใหม่ที่ไม่ซ้ำกันให้อัตโนมัติ และเขียนเฉพาะ record นี้
-        // (ไม่เขียนทับข้อมูลทั้งก้อน จึงปลอดภัยแม้มีคนจองพร้อมกันหลายคน)
-        bookingsRef.push(newBooking).then(() => {
-            alert(`🎉 ส่งคำขอสำเร็จ!\nห้อง: ${room}\nวันที่: ${selectedDate}\nเวลาที่จอง: ${selectedTimeSlotText}\n\nสถานะ: กำลังรอแอดมินอนุมัติ`);
-
+        // ใช้ push() แยก key ออกมาก่อน เพื่อรู้ id ล่วงหน้าไว้เปิดหน้าห้องปาร์ตี้ทันที
+        const newRef = bookingsRef.push();
+        newRef.set(newBooking).then(() => {
             document.getElementById('booking-reason').value = "";
             selectedTimeSlotText = "";
             document.getElementById('booking-card').classList.add('hidden-view');
@@ -950,8 +1225,8 @@
                 }
             });
 
-            // จองเสร็จแล้วเด้งไปหน้าประวัติการจองเพื่อให้ผู้ใช้เห็นสถานะของตัวเองทันที
-            switchView('view-user-history');
+            // จองเสร็จแล้วพาไปหน้าห้องปาร์ตี้ทันที ให้เห็น/คัดลอกรหัสไปแชร์เพื่อนได้เลย
+            openPartyRoom(newRef.key, newBooking);
         }).catch((err) => {
             console.error(err);
             alert("⚠️ ส่งคำขอไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่อีกครั้ง");
