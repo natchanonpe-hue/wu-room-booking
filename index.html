@@ -16,9 +16,9 @@
     .slot-available { background-color: #d1fae5; color: #065f46; border: 1px solid #10b981; cursor: pointer; }
     .slot-available:hover { background-color: #a7f3d0; }
     .slot-selected { background-color: #10b981; color: white; border: 1px solid #047857; cursor: pointer; font-weight: bold; transform: scale(1.05); }
-    .slot-class { background-color: #fee2e2; color: #991b1b; border: 1px solid #ef4444; opacity: 0.6; cursor: not-allowed; }
-    .slot-booked { background-color: #fef3c7; color: #92400e; border: 1px solid #f59e0b; opacity: 0.7; cursor: not-allowed; }
-    .slot-pending { background-color: #ede9fe; color: #5b21b6; border: 1px solid #8b5cf6; opacity: 0.8; cursor: not-allowed; }
+    .slot-class { background-color: #fee2e2; color: #991b1b; border: 1px solid #ef4444; opacity: 0.8; cursor: pointer; }
+    .slot-booked { background-color: #fef3c7; color: #92400e; border: 1px solid #f59e0b; opacity: 0.85; cursor: pointer; }
+    .slot-pending { background-color: #ede9fe; color: #5b21b6; border: 1px solid #8b5cf6; opacity: 0.9; cursor: pointer; }
     .slot-past { background-color: #f3f4f6; color: #9ca3af; border: 1px dashed #d1d5db; cursor: not-allowed; }
     .toast { animation: fadein 0.25s ease, fadeout 0.25s ease 2.3s; }
     @keyframes fadein { from{opacity:0; transform: translate(-50%,10px);} to{opacity:1; transform: translate(-50%,0);} }
@@ -297,6 +297,11 @@
                     <!-- ข้อมูลตารางเวลาจะมาโผล่ตรงนี้ -->
                 </div>
 
+                <!-- 💡 กล่องแนะนำห้องทางเลือก (โผล่เมื่อกดช่องที่ไม่ว่าง) -->
+                <div id="room-suggestion-box" class="hidden-view bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <!-- เนื้อหาสร้างด้วย JavaScript -->
+                </div>
+
                 <!-- ฟอร์มกรอกข้อมูล -->
                 <div id="booking-form" class="space-y-4 mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100 hidden-view">
                     <p class="text-sm text-blue-800 font-bold mb-2">✅ คุณเลือกเวลา: <span id="display-selected-time" class="text-blue-600 underline">--:--</span></p>
@@ -397,9 +402,7 @@
     // 1.1 ระบบแจ้งเตือนแบบ Push จริง ผ่าน Firebase Cloud Messaging (FCM)
     // ทำงานได้แม้ปิดแท็บ/ปิดเบราว์เซอร์ไปแล้ว (ยกเว้น iPhone ต้อง "เพิ่มไปหน้าจอโฮม" ก่อน เพราะข้อจำกัดของ Apple)
     // ==========================================
-    const VAPID_KEY = "BCLieHftg_d-MnzNpHSg-nVVWFVxUAg7w5T5QHqV4W2E4NNWdcNpLU5rCG9GujZmGKFNAWVl5eE0hdgzzkfQh48"
- 
-    // หาได้ที่ Firebase Console > Project Settings > Cloud Messaging > Web Push certificates > Generate key pair
+    const VAPID_KEY = "BCLieHftg_d-MnzNpHSg-nVVWFVxUAg7w5T5QHqV4W2E4NNWdcNpLU5rCG9GujZmGKFNAWVl5eE0hdgzzkfQh48"; // Web Push certificate key pair จาก Firebase Console
     let notificationsEnabled = false;
     let messaging = null;
 
@@ -779,6 +782,7 @@
         document.getElementById('selected-date-label').innerText = dateStr;
         const grid = document.getElementById('time-slots-grid');
         grid.innerHTML = "";
+        document.getElementById('room-suggestion-box').classList.add('hidden-view'); // ซ่อนกล่องแนะนำเดิมทุกครั้งที่เปลี่ยนห้อง/วันที่
 
         const now = new Date();
         const isToday = dateStr === todayStr();
@@ -819,7 +823,8 @@
                     btn.classList.add('slot-pending');
                     btn.innerHTML = `${timeText}<br><span class="text-[9px] font-normal">รออนุมัติ</span>`;
                 }
-                btn.disabled = true;
+                // ไม่ disabled แล้ว เพราะให้กดเพื่อดู "ห้องทางเลือก" ที่ว่างช่วงเดียวกันแทน
+                btn.onclick = () => showRoomSuggestions(dateStr, i, timeText);
                 grid.appendChild(btn);
                 continue;
             }
@@ -828,13 +833,64 @@
             if (occupiedHours.includes(i)) {
                 btn.classList.add('slot-class');
                 btn.innerHTML = `${timeText}<br><span class="text-[9px] font-normal">มีเรียน</span>`;
-                btn.disabled = true;
+                btn.onclick = () => showRoomSuggestions(dateStr, i, timeText);
             } else {
                 btn.classList.add('slot-available');
                 btn.innerHTML = `${timeText}<br><span class="text-[9px] font-normal">ว่าง</span>`;
                 btn.onclick = () => selectTime(btn, timeText);
             }
             grid.appendChild(btn);
+        }
+    }
+
+    // ==========================================
+    // 6.1 ระบบแนะนำห้องทางเลือก
+    // เมื่อช่วงเวลาที่อยากได้ไม่ว่างในห้องนี้ ให้เสนอห้องอื่นที่ว่างช่วงเวลาเดียวกันแทน
+    // ==========================================
+    function isRoomAvailableAt(roomName, dateStr, hour) {
+        const bookings = loadBookings() || [];
+        const timeText = `${String(hour).padStart(2, '0')}:00-${String(hour + 1).padStart(2, '0')}:00`;
+        const existing = bookings.find(b => b.room === roomName && b.date === dateStr && b.time === timeText && b.status !== 'rejected' && b.status !== 'cancelled');
+        if (existing) return false;
+
+        const dObj = new Date(dateStr);
+        const dayIndex = String(dObj.getDay());
+        const roomSchedule = scheduleData[roomName] || {};
+        const occupiedHours = roomSchedule[dayIndex] || [];
+        if (occupiedHours.includes(hour)) return false;
+
+        return true;
+    }
+
+    function findAvailableRoomsForSlot(dateStr, hour, excludeRoom) {
+        const allRooms = Array.from(document.querySelectorAll('.room-btn')).map(b => b.getAttribute('data-room'));
+        return allRooms.filter(r => r !== excludeRoom && isRoomAvailableAt(r, dateStr, hour));
+    }
+
+    function showRoomSuggestions(dateStr, hour, timeText) {
+        const alternatives = findAvailableRoomsForSlot(dateStr, hour, selectedRoomName);
+        const box = document.getElementById('room-suggestion-box');
+
+        if (alternatives.length === 0) {
+            box.innerHTML = `<p class="text-xs text-gray-500 text-center py-1">😢 ช่วงเวลา ${timeText} ห้องอื่นก็เต็ม/มีเรียนหมดเหมือนกัน ลองเลือกเวลาอื่นดูนะครับ</p>`;
+        } else {
+            box.innerHTML = `
+                <p class="text-xs font-bold text-blue-700 mb-2">💡 ห้อง ${selectedRoomName} ไม่ว่างช่วง ${timeText} แต่ห้องอื่นว่างอยู่ ลองดูนี่แทนไหม?</p>
+                <div class="flex flex-wrap gap-2">
+                    ${alternatives.map(r => `<button onclick="jumpToRoom('${r}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">🚪 ${r}</button>`).join('')}
+                </div>
+            `;
+        }
+        box.classList.remove('hidden-view');
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // กดเลือกห้องแนะนำ -> สลับไปห้องนั้นทันที (ใช้ event listener เดิมของปุ่มห้อง เพื่อให้เช็คโควต้าการจองซ้ำด้วย)
+    function jumpToRoom(roomName) {
+        const btn = document.querySelector(`.room-btn[data-room="${roomName}"]`);
+        if (btn) {
+            btn.click();
+            showToast(`📍 สลับไปดูห้อง ${roomName} แล้ว`);
         }
     }
 
