@@ -23,6 +23,7 @@
     .slot-booked { background-color: #fef3c7; color: #92400e; border: 1px solid #f59e0b; opacity: 0.85; cursor: pointer; }
     .slot-pending { background-color: #ede9fe; color: #5b21b6; border: 1px solid #8b5cf6; opacity: 0.9; cursor: pointer; }
     .slot-party { background-color: #cffafe; color: #155e75; border: 1px solid #06b6d4; opacity: 0.95; cursor: pointer; }
+    .slot-movie { background-color: #fae8ff; color: #86198f; border: 1px solid #d946ef; opacity: 0.9; cursor: not-allowed; }
     .slot-past { background-color: #f3f4f6; color: #9ca3af; border: 1px dashed #d1d5db; cursor: not-allowed; }
     .toast { animation: fadein 0.25s ease, fadeout 0.25s ease 2.3s; }
     @keyframes fadein { from{opacity:0; transform: translate(-50%,10px);} to{opacity:1; transform: translate(-50%,0);} }
@@ -486,7 +487,9 @@
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-600 mb-1">ห้องที่ฉาย</label>
-                        <input type="text" id="movie-form-room" placeholder="เช่น NG1101" class="w-full p-2 border border-gray-300 rounded text-sm">
+                        <select id="movie-form-room" class="w-full p-2 border border-gray-300 rounded text-sm bg-white">
+                            <!-- รายการห้องสร้างด้วย JavaScript -->
+                        </select>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
@@ -1422,8 +1425,19 @@
     }
 
     // ---------- จัดการรอบหนัง (Admin) ----------
+    function getAllRoomNames() {
+        return Array.from(document.querySelectorAll('.room-btn')).map(b => b.getAttribute('data-room'));
+    }
+
+    function populateRoomSelect(selectEl, selectedValue) {
+        const rooms = getAllRoomNames();
+        selectEl.innerHTML = rooms.map(r => `<option value="${r}">${r}</option>`).join('');
+        if (selectedValue) selectEl.value = selectedValue;
+    }
+
     function openMovieRoundForm(roundId) {
         document.getElementById('movie-round-form').classList.remove('hidden-view');
+        const roomSelect = document.getElementById('movie-form-room');
         if (roundId && movieRoundsCache[roundId]) {
             const r = movieRoundsCache[roundId];
             document.getElementById('movie-form-round-id').value = roundId;
@@ -1431,14 +1445,15 @@
             document.getElementById('movie-form-poster').value = r.posterUrl || '';
             document.getElementById('movie-form-details').value = r.details || '';
             document.getElementById('movie-form-date').value = r.date || '';
-            document.getElementById('movie-form-room').value = r.room || '';
+            populateRoomSelect(roomSelect, r.room);
             document.getElementById('movie-form-start').value = r.startTime || '';
             document.getElementById('movie-form-end').value = r.endTime || '';
             document.getElementById('movie-form-rows').value = r.rows || 5;
             document.getElementById('movie-form-cols').value = r.cols || 6;
         } else {
             document.getElementById('movie-form-round-id').value = '';
-            ['movie-form-title', 'movie-form-poster', 'movie-form-details', 'movie-form-room'].forEach(id => document.getElementById(id).value = '');
+            ['movie-form-title', 'movie-form-poster', 'movie-form-details'].forEach(id => document.getElementById(id).value = '');
+            populateRoomSelect(roomSelect);
             document.getElementById('movie-form-date').value = '';
             document.getElementById('movie-form-start').value = '18:00';
             document.getElementById('movie-form-end').value = '20:00';
@@ -1723,6 +1738,16 @@
                 continue;
             }
 
+            // เช็คว่าช่วงเวลานี้มีรอบฉาย Movie Club จองห้องนี้ไว้อยู่หรือไม่
+            const movieConflict = findMovieRoundConflict(roomName, dateStr, i);
+            if (movieConflict) {
+                btn.classList.add('slot-movie');
+                btn.innerHTML = `${timeText}<br><span class="text-[9px] font-normal">🎬 มีฉายหนัง</span>`;
+                btn.disabled = true;
+                grid.appendChild(btn);
+                continue;
+            }
+
             // แทนที่การสุ่ม (Hash) ด้วยการตรวจสอบจากตารางเรียนจริง
             if (occupiedHours.includes(i)) {
                 btn.classList.add('slot-class');
@@ -1741,11 +1766,23 @@
     // 6.1 ระบบแนะนำห้องทางเลือก
     // เมื่อช่วงเวลาที่อยากได้ไม่ว่างในห้องนี้ ให้เสนอห้องอื่นที่ว่างช่วงเวลาเดียวกันแทน
     // ==========================================
+    // เช็คว่าห้อง/วัน/ชั่วโมงนี้ มีรอบฉาย Movie Club จับจองไว้อยู่หรือไม่ (คืนค่า round object ถ้าชน)
+    function findMovieRoundConflict(roomName, dateStr, hour) {
+        return Object.values(movieRoundsCache).find(r => {
+            if (r.room !== roomName || r.date !== dateStr) return false;
+            const startH = parseInt((r.startTime || '0:0').split(':')[0], 10);
+            const endH = parseInt((r.endTime || '0:0').split(':')[0], 10);
+            return hour >= startH && hour < endH;
+        }) || null;
+    }
+
     function isRoomAvailableAt(roomName, dateStr, hour) {
         const bookings = loadBookings() || [];
         const timeText = `${String(hour).padStart(2, '0')}:00-${String(hour + 1).padStart(2, '0')}:00`;
         const existing = bookings.find(b => b.room === roomName && b.date === dateStr && b.time === timeText && b.status !== 'rejected' && b.status !== 'cancelled');
         if (existing) return false;
+
+        if (findMovieRoundConflict(roomName, dateStr, hour)) return false; // ห้องนี้ถูกจองไว้ฉายหนังแล้ว
 
         const dObj = new Date(dateStr);
         const dayIndex = String(dObj.getDay());
