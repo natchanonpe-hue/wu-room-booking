@@ -9,6 +9,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
+<!-- Movie Club: สร้าง QR Code (ตั๋ว) + สแกน QR Code ด้วยกล้อง (แอดมินเช็คอิน) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
     .map-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .hidden-view { display: none !important; }
@@ -95,6 +98,8 @@
                 <button onclick="switchView('view-role')" class="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full font-bold">ออกจากระบบ</button>
             </div>
 
+            <button onclick="switchView('view-movie-admin')" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-lg font-bold text-sm mb-4 flex items-center justify-center gap-2">🎬 จัดการ Movie Club</button>
+
             <!-- แท็บสลับสถานะ -->
             <div class="flex gap-1 mb-4 bg-white p-1 rounded-lg shadow-sm border border-gray-200">
                 <button class="tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="pending" onclick="setAdminTab('pending')">⏳ รออนุมัติ</button>
@@ -133,7 +138,7 @@
             </div>
 
             <h2 class="text-lg font-bold text-gray-800 mb-4">🏢 เลือกอาคารที่ต้องการจอง</h2>
-            <div class="space-y-3">
+            <div class="space-y-3 mb-6">
                 <button onclick="switchView('view-map')" class="w-full bg-white p-4 rounded-xl shadow-sm border border-blue-200 hover:border-blue-500 flex justify-between items-center text-left">
                     <div>
                         <h3 class="font-bold text-blue-700 text-lg">อาคารเรียน Next Gen (NG)</h3>
@@ -146,6 +151,17 @@
                         <h3 class="font-bold text-gray-600 text-lg">อาคารไทยบุรี</h3>
                         <p class="text-xs text-red-500 mt-1">ระบบกำลังพัฒนา...</p>
                     </div>
+                </button>
+            </div>
+
+            <h2 class="text-lg font-bold text-gray-800 mb-4">🎉 ชมรม (Clubs)</h2>
+            <div class="space-y-3">
+                <button onclick="switchView('view-movie-club')" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 rounded-xl shadow-sm flex justify-between items-center text-left">
+                    <div>
+                        <h3 class="font-bold text-lg">🎬 Movie Club</h3>
+                        <p class="text-xs text-purple-100 mt-1">ดูรอบหนังและจองที่นั่งทุกวันอาทิตย์</p>
+                    </div>
+                    <span class="text-2xl">➔</span>
                 </button>
             </div>
         </div>
@@ -365,6 +381,155 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- VIEW 9: Movie Club - รายการรอบหนังทั้งหมด -->
+        <!-- ========================================== -->
+        <div id="view-movie-club" class="hidden-view flex-1">
+            <button onclick="switchView('view-building')" class="mb-3 text-sm text-blue-600 font-bold flex items-center gap-1">← กลับ</button>
+            <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl p-4 mb-4">
+                <h2 class="text-xl font-bold">🎬 Movie Club</h2>
+                <p class="text-xs text-purple-100 mt-1">ทุกวันอาทิตย์ - เลือกรอบที่อยากดู แล้วจองที่นั่งได้เลย</p>
+            </div>
+            <div id="movie-club-list" class="space-y-3"></div>
+            <p id="movie-club-empty" class="hidden-view text-center text-gray-400 text-sm py-10">ยังไม่มีรอบหนังที่เปิดให้จองตอนนี้ครับ</p>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 10: Movie Club - รายละเอียดรอบ + ผังที่นั่ง -->
+        <!-- ========================================== -->
+        <div id="view-movie-round-detail" class="hidden-view flex-1">
+            <button onclick="switchView('view-movie-club')" class="mb-3 text-sm text-blue-600 font-bold flex items-center gap-1">← กลับรายการรอบหนัง</button>
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden mb-4">
+                <img id="movie-detail-poster" src="" class="w-full h-56 object-cover bg-gray-200">
+                <div class="p-4">
+                    <h2 id="movie-detail-title" class="text-xl font-bold text-gray-800">-</h2>
+                    <p id="movie-detail-datetime" class="text-sm text-gray-500 mt-1">📅 -</p>
+                    <p id="movie-detail-room" class="text-sm text-gray-500">🚪 -</p>
+                    <p id="movie-detail-details" class="text-sm text-gray-600 mt-3 border-t pt-3">-</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 p-4 mb-6">
+                <p class="text-center text-[10px] font-bold text-gray-400 mb-1 tracking-widest">🖥️ จอฉาย</p>
+                <div class="w-full h-1.5 bg-gray-300 rounded-full mb-4"></div>
+
+                <div class="flex justify-center gap-4 text-[10px] font-bold text-gray-500 mb-3">
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-100 border border-green-500 rounded-sm inline-block"></span> ว่าง</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-purple-600 rounded-sm inline-block"></span> ที่เลือก</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-gray-300 rounded-sm inline-block"></span> จองแล้ว</span>
+                </div>
+
+                <div id="movie-seat-map" class="overflow-x-auto pb-2"></div>
+
+                <div class="mt-4 pt-3 border-t border-gray-100">
+                    <p class="text-sm text-gray-600 text-center mb-3">ที่นั่งที่เลือก: <span id="movie-selected-seat-label" class="font-bold text-purple-700">ยังไม่ได้เลือก</span></p>
+                    <button onclick="bookMovieSeat()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg font-bold text-sm">🎟️ จองที่นั่งนี้</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 11: Movie Club - ตั๋ว QR Code -->
+        <!-- ========================================== -->
+        <div id="view-movie-ticket" class="hidden-view flex-1">
+            <button onclick="switchView('view-user-history')" class="mb-3 text-sm text-blue-600 font-bold flex items-center gap-1">← กลับหน้าประวัติ</button>
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden mb-4 text-center">
+                <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4">
+                    <p class="text-xs text-purple-100">🎟️ ตั๋วหนัง Movie Club</p>
+                    <h2 id="ticket-movie-title" class="text-lg font-bold">-</h2>
+                    <p id="ticket-datetime" class="text-xs text-purple-100 mt-1">-</p>
+                </div>
+                <div class="p-5">
+                    <p class="text-xs text-gray-500 mb-1">ที่นั่งของคุณ</p>
+                    <p id="ticket-seat" class="text-3xl font-black text-purple-700 mb-4">-</p>
+
+                    <div id="ticket-qr-container" class="flex justify-center mb-4"></div>
+
+                    <p class="text-xs text-gray-400 mb-4">แสดง QR นี้ให้แอดมินสแกนที่หน้าห้องฉาย</p>
+                    <p id="ticket-checkin-status" class="text-sm font-bold mb-4"></p>
+
+                    <button onclick="cancelMovieTicket()" id="ticket-cancel-btn" class="w-full bg-red-50 border border-red-300 text-red-600 py-2 rounded-lg text-xs font-bold hover:bg-red-100">🚫 ยกเลิกตั๋วนี้</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 12: Movie Club - จัดการรอบหนัง (Admin) -->
+        <!-- ========================================== -->
+        <div id="view-movie-admin" class="hidden-view flex-1">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-bold text-gray-800 text-lg">🎬 จัดการ Movie Club</h2>
+                <button onclick="switchView('view-admin')" class="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-bold">← กลับแดชบอร์ด</button>
+            </div>
+
+            <button onclick="switchView('view-movie-scanner')" class="w-full bg-gray-900 hover:bg-black text-white p-3 rounded-lg font-bold text-sm mb-3">📷 สแกน QR เช็คอินผู้ชม</button>
+            <button onclick="openMovieRoundForm()" class="w-full bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-lg font-bold text-sm mb-4">+ เพิ่มรอบหนังใหม่</button>
+
+            <div id="movie-round-form" class="hidden-view bg-white p-4 rounded-lg shadow-md border border-gray-200 mb-4 space-y-3">
+                <input type="hidden" id="movie-form-round-id">
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">ชื่อหนัง</label>
+                    <input type="text" id="movie-form-title" class="w-full p-2 border border-gray-300 rounded text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">ลิงก์รูปหน้าปก (URL)</label>
+                    <input type="text" id="movie-form-poster" placeholder="https://..." class="w-full p-2 border border-gray-300 rounded text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">รายละเอียด</label>
+                    <textarea id="movie-form-details" rows="2" class="w-full p-2 border border-gray-300 rounded text-sm"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">วันที่ฉาย (ต้องเป็นวันอาทิตย์)</label>
+                        <input type="date" id="movie-form-date" class="w-full p-2 border border-gray-300 rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">ห้องที่ฉาย</label>
+                        <input type="text" id="movie-form-room" placeholder="เช่น NG1101" class="w-full p-2 border border-gray-300 rounded text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">เวลาเริ่ม</label>
+                        <input type="time" id="movie-form-start" class="w-full p-2 border border-gray-300 rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">เวลาจบ</label>
+                        <input type="time" id="movie-form-end" class="w-full p-2 border border-gray-300 rounded text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">จำนวนแถวที่นั่ง</label>
+                        <input type="number" id="movie-form-rows" min="1" max="15" value="5" class="w-full p-2 border border-gray-300 rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">จำนวนที่นั่ง/แถว</label>
+                        <input type="number" id="movie-form-cols" min="1" max="15" value="6" class="w-full p-2 border border-gray-300 rounded text-sm">
+                    </div>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button onclick="saveMovieRound()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-bold">💾 บันทึก</button>
+                    <button onclick="closeMovieRoundForm()" class="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg text-sm font-bold">ยกเลิก</button>
+                </div>
+            </div>
+
+            <div id="movie-admin-round-list" class="space-y-3"></div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 13: Movie Club - สแกน QR เช็คอิน (Admin) -->
+        <!-- ========================================== -->
+        <div id="view-movie-scanner" class="hidden-view flex-1">
+            <button onclick="stopMovieScanner(); switchView('view-movie-admin')" class="mb-3 text-sm text-blue-600 font-bold flex items-center gap-1">← กลับ</button>
+            <h2 class="text-lg font-bold text-gray-800 mb-3 text-center">📷 สแกน QR เช็คอิน</h2>
+
+            <div id="movie-scanner-reader" class="rounded-xl overflow-hidden shadow-md mb-4"></div>
+
+            <div id="movie-scan-result" class="hidden-view bg-white rounded-xl shadow-md border border-gray-200 p-4"></div>
+        </div>
+
     </main>
 
     <!-- Toast แจ้งเตือนแบบลอย -->
@@ -582,16 +747,21 @@
     // 3. ระบบนำทาง (Navigation) & ระบบผู้ใช้งาน
     // ==========================================
     function switchView(viewId) {
-        ['view-role', 'view-login', 'view-admin', 'view-user-login', 'view-building', 'view-map', 'view-user-history', 'view-party-room'].forEach(id => {
+        ['view-role', 'view-login', 'view-admin', 'view-user-login', 'view-building', 'view-map', 'view-user-history', 'view-party-room',
+         'view-movie-club', 'view-movie-round-detail', 'view-movie-ticket', 'view-movie-admin', 'view-movie-scanner'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.classList.add('hidden-view');
         });
+
+        // ออกจากหน้าสแกนกล้องแล้ว ต้องปิดกล้องด้วยเสมอ ไม่งั้นกล้องจะค้างเปิดอยู่เบื้องหลัง
+        if (viewId !== 'view-movie-scanner') stopMovieScanner();
 
         const headerTitle = document.getElementById('header-title');
         if (viewId === 'view-admin') headerTitle.innerText = "Admin Dashboard";
         else if (viewId === 'view-login') headerTitle.innerText = "Admin Login";
         else if (viewId === 'view-user-login') headerTitle.innerText = "User Login";
         else if (viewId === 'view-party-room') headerTitle.innerText = "ห้องปาร์ตี้";
+        else if (viewId.startsWith('view-movie')) headerTitle.innerText = "🎬 Movie Club";
         else headerTitle.innerText = "WU Room Booking";
 
         document.getElementById(viewId).classList.remove('hidden-view');
@@ -602,6 +772,9 @@
             initDatePicker();
             document.getElementById('booking-card').classList.add('hidden-view');
         }
+        if (viewId === 'view-movie-club') renderMovieClubList();
+        if (viewId === 'view-movie-admin') renderMovieAdminList();
+        if (viewId === 'view-movie-scanner') startMovieScanner();
     }
 
     function checkUserRole() {
@@ -943,17 +1116,37 @@
         const bookings = loadBookings() || [];
         // แสดงทั้งห้องที่ตัวเองเป็นเจ้าของ และห้องที่เข้าร่วมเป็นสมาชิกปาร์ตี้คนอื่น
         const myBookings = bookings.filter(b => isUserInBooking(b, currentUserId)).sort((a,b) => b.createdAt - a.createdAt);
+        const myTickets = getMyMovieTickets().sort((a,b) => b.bookedAt - a.bookedAt);
         
         const container = document.getElementById('user-history-container');
         const emptyMsg = document.getElementById('user-history-empty');
         container.innerHTML = "";
         
-        if (myBookings.length === 0) {
+        if (myBookings.length === 0 && myTickets.length === 0) {
             emptyMsg.classList.remove('hidden-view');
             return;
         }
         emptyMsg.classList.add('hidden-view');
-        
+
+        // 🎬 ตั๋ว Movie Club (แสดงก่อน เพราะมักเป็นกิจกรรมเร่งด่วน/ใกล้เวลา)
+        myTickets.forEach(t => {
+            const r = movieRoundsCache[t.roundId];
+            if (!r) return;
+            const card = document.createElement('div');
+            card.className = "bg-white p-4 rounded-lg shadow-sm border-l-4 border-purple-400";
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <p class="font-bold text-gray-800 text-sm mb-1">🎬 ${r.title || 'Movie Club'}</p>
+                        <p class="text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block">📅 ${r.date} | ⏱️ ${r.startTime}-${r.endTime} | 💺 ${t.seat}</p>
+                    </div>
+                    ${t.checkedIn ? '<span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded shadow-sm">✅ เช็คอินแล้ว</span>' : '<span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1 rounded shadow-sm">🎟️ มีตั๋ว</span>'}
+                </div>
+                <button onclick="openMovieTicket('${t.roundId}', '${t.seat}')" class="w-full mt-3 bg-purple-50 border border-purple-300 text-purple-700 py-2 rounded-lg text-xs font-bold hover:bg-purple-100">🎟️ ดูตั๋ว / QR Code</button>
+            `;
+            container.appendChild(card);
+        });
+
         myBookings.forEach(b => {
             const borderColor = b.status === 'approved' ? 'border-green-400' : b.status === 'rejected' ? 'border-red-400' : b.status === 'cancelled' ? 'border-gray-400' : 'border-yellow-400';
             const isOwner = b.userId === currentUserId;
@@ -974,6 +1167,458 @@
             `;
             container.appendChild(card);
         });
+    }
+
+    // ==========================================
+    // 4.3 ระบบ Movie Club — จองรอบหนัง, ผังที่นั่ง, ตั๋ว QR, จัดการรอบ (Admin), สแกนเช็คอิน
+    // ==========================================
+    const movieRoundsRef = db.ref('movieClub/rounds');
+    const movieSeatsRef = db.ref('movieClub/seats');        // movieClub/seats/{roundId}/{seatLabel} = {userId, bookedAt, checkedIn}
+    const movieUserTicketsRef = db.ref('movieClub/userTickets'); // ดัชนีย้อนกลับ (เพื่อความสะดวก ไม่ใช่จุดตรวจสอบหลัก)
+
+    let movieRoundsCache = {};
+    let movieSeatsCache = {};
+    let currentMovieRoundId = null;
+    let selectedMovieSeat = null;
+    let currentMovieTicketKey = null; // { roundId, seat }
+    let movieScannerInstance = null;
+
+    function initMovieClubSync() {
+        movieRoundsRef.on('value', (snapshot) => {
+            const data = snapshot.val() || {};
+            movieRoundsCache = {};
+            Object.keys(data).forEach(id => { movieRoundsCache[id] = { id, ...data[id] }; });
+            refreshMovieViews();
+        }, (error) => console.error("Movie rounds sync error:", error));
+
+        movieSeatsRef.on('value', (snapshot) => {
+            movieSeatsCache = snapshot.val() || {};
+            refreshMovieViews();
+        }, (error) => console.error("Movie seats sync error:", error));
+    }
+
+    function refreshMovieViews() {
+        if (!document.getElementById('view-movie-club').classList.contains('hidden-view')) renderMovieClubList();
+        if (!document.getElementById('view-movie-round-detail').classList.contains('hidden-view') && currentMovieRoundId) {
+            renderMovieRoundDetailInfo(currentMovieRoundId);
+            renderMovieSeatMap(currentMovieRoundId);
+        }
+        if (!document.getElementById('view-movie-admin').classList.contains('hidden-view')) renderMovieAdminList();
+        if (!document.getElementById('view-movie-ticket').classList.contains('hidden-view') && currentMovieTicketKey) {
+            renderMovieTicket(currentMovieTicketKey.roundId, currentMovieTicketKey.seat);
+        }
+        if (!document.getElementById('view-user-history').classList.contains('hidden-view')) renderUserHistory();
+    }
+
+    function totalSeatsOf(round) {
+        return (round.rows || 5) * (round.cols || 6);
+    }
+
+    // ---------- รายการรอบหนัง (User) ----------
+    function renderMovieClubList() {
+        const container = document.getElementById('movie-club-list');
+        const emptyMsg = document.getElementById('movie-club-empty');
+        container.innerHTML = "";
+        const today = todayStr();
+        const rounds = Object.values(movieRoundsCache)
+            .filter(r => r.date >= today)
+            .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+
+        if (rounds.length === 0) {
+            emptyMsg.classList.remove('hidden-view');
+            return;
+        }
+        emptyMsg.classList.add('hidden-view');
+
+        rounds.forEach(r => {
+            const seats = movieSeatsCache[r.id] || {};
+            const bookedCount = Object.keys(seats).length;
+            const total = totalSeatsOf(r);
+            const isFull = bookedCount >= total;
+            const card = document.createElement('div');
+            card.className = "bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex cursor-pointer hover:shadow-md transition";
+            card.onclick = () => openMovieRoundDetail(r.id);
+            card.innerHTML = `
+                <img src="${r.posterUrl || 'https://placehold.co/100x140?text=No+Poster'}" class="w-20 h-28 object-cover bg-gray-200 flex-shrink-0">
+                <div class="p-3 flex-1 min-w-0">
+                    <h3 class="font-bold text-gray-800 text-sm truncate">${r.title || 'ยังไม่ได้ตั้งชื่อ'}</h3>
+                    <p class="text-[11px] text-gray-500 mt-1">📅 ${r.date} | ⏱️ ${r.startTime}-${r.endTime}</p>
+                    <p class="text-[11px] text-gray-500">🚪 ${r.room || '-'}</p>
+                    <p class="text-[11px] font-bold mt-1 ${isFull ? 'text-red-500' : 'text-green-600'}">${isFull ? '🔴 เต็มแล้ว' : `🟢 เหลือ ${total - bookedCount}/${total} ที่`}</p>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    // ---------- รายละเอียดรอบ + ผังที่นั่ง (User) ----------
+    function openMovieRoundDetail(roundId) {
+        currentMovieRoundId = roundId;
+        selectedMovieSeat = null;
+        switchView('view-movie-round-detail');
+        renderMovieRoundDetailInfo(roundId);
+        renderMovieSeatMap(roundId);
+    }
+
+    function renderMovieRoundDetailInfo(roundId) {
+        const r = movieRoundsCache[roundId];
+        if (!r) return;
+        document.getElementById('movie-detail-poster').src = r.posterUrl || 'https://placehold.co/400x220?text=No+Poster';
+        document.getElementById('movie-detail-title').innerText = r.title || 'ยังไม่ได้ตั้งชื่อ';
+        document.getElementById('movie-detail-datetime').innerText = `📅 ${r.date}  |  ⏱️ ${r.startTime}-${r.endTime}`;
+        document.getElementById('movie-detail-room').innerText = `🚪 ห้อง ${r.room || '-'}`;
+        document.getElementById('movie-detail-details').innerText = r.details || '';
+    }
+
+    function seatLabel(row, col) {
+        const rowLetter = String.fromCharCode(65 + row); // 0->A, 1->B, ...
+        return `${rowLetter}${col + 1}`;
+    }
+
+    function findMySeatForRound(roundId) {
+        const seats = movieSeatsCache[roundId] || {};
+        for (const label in seats) {
+            if (seats[label].userId === currentUserId) return label;
+        }
+        return null;
+    }
+
+    function renderMovieSeatMap(roundId) {
+        const r = movieRoundsCache[roundId];
+        if (!r) return;
+        const rows = r.rows || 5;
+        const cols = r.cols || 6;
+        const seats = movieSeatsCache[roundId] || {};
+        const mySeat = findMySeatForRound(roundId);
+
+        let html = '<div class="inline-flex flex-col gap-1.5 mx-auto">';
+        for (let row = 0; row < rows; row++) {
+            html += '<div class="flex gap-1.5 justify-center">';
+            for (let col = 0; col < cols; col++) {
+                const label = seatLabel(row, col);
+                const isTaken = !!seats[label];
+                const isMine = mySeat === label;
+                const isSelected = selectedMovieSeat === label;
+                let cls = "w-8 h-8 rounded text-[10px] font-bold flex items-center justify-center flex-shrink-0 ";
+                if (isMine) cls += "bg-amber-400 text-white";
+                else if (isTaken) cls += "bg-gray-300 text-gray-500 cursor-not-allowed";
+                else if (isSelected) cls += "bg-purple-600 text-white cursor-pointer";
+                else cls += "bg-green-100 text-green-700 border border-green-400 hover:bg-green-200 cursor-pointer";
+                const clickable = !isTaken && !isMine;
+                html += `<button ${clickable ? `onclick="selectMovieSeat('${label}')"` : 'disabled'} class="${cls}">${label}</button>`;
+            }
+            html += '</div>';
+        }
+        html += '</div>';
+        document.getElementById('movie-seat-map').innerHTML = html;
+        document.getElementById('movie-selected-seat-label').innerText = selectedMovieSeat || (mySeat ? `${mySeat} (คุณจองไว้แล้ว)` : 'ยังไม่ได้เลือก');
+    }
+
+    function selectMovieSeat(label) {
+        selectedMovieSeat = label;
+        renderMovieSeatMap(currentMovieRoundId);
+    }
+
+    // จองที่นั่ง (ใช้ Firebase transaction กันที่นั่งชนกันตอนมีคนกดพร้อมกัน)
+    function bookMovieSeat() {
+        if (!currentMovieRoundId) return;
+        const roundId = currentMovieRoundId;
+
+        const existingSeat = findMySeatForRound(roundId);
+        if (existingSeat) {
+            openMovieTicket(roundId, existingSeat); // มีตั๋วรอบนี้อยู่แล้ว พาไปดูตั๋วเลย (1 คน 1 ที่นั่ง/รอบ)
+            return;
+        }
+        if (!selectedMovieSeat) return alert("⚠️ กรุณาเลือกที่นั่งก่อนครับ");
+        const seat = selectedMovieSeat;
+
+        movieSeatsRef.child(roundId).child(seat).transaction((current) => {
+            if (current) return; // มีคนจองที่นั่งนี้ไปแล้วพอดี -> ยกเลิก transaction
+            return { userId: currentUserId, bookedAt: Date.now(), checkedIn: false };
+        }, (error, committed) => {
+            if (error) {
+                console.error(error);
+                showToast("⚠️ จองไม่สำเร็จ ลองใหม่อีกครั้ง");
+                return;
+            }
+            if (!committed) {
+                alert("😢 ที่นั่งนี้เพิ่งถูกจองไปพอดีเลยครับ ลองเลือกที่อื่นดูนะครับ");
+                selectedMovieSeat = null;
+                renderMovieSeatMap(roundId);
+                return;
+            }
+            movieUserTicketsRef.child(currentUserId).child(roundId).set(seat); // ดัชนีย้อนกลับ เพื่อความสะดวก
+            selectedMovieSeat = null;
+            showToast("🎉 จองที่นั่งสำเร็จ!");
+            openMovieTicket(roundId, seat);
+        });
+    }
+
+    // ---------- ตั๋ว QR Code (User) ----------
+    function openMovieTicket(roundId, seat) {
+        currentMovieTicketKey = { roundId, seat };
+        switchView('view-movie-ticket');
+        renderMovieTicket(roundId, seat);
+    }
+
+    function renderMovieTicket(roundId, seat) {
+        const r = movieRoundsCache[roundId];
+        const seatData = (movieSeatsCache[roundId] || {})[seat];
+        if (!r || !seatData) {
+            showToast("⚠️ ไม่พบตั๋วนี้แล้ว (อาจถูกยกเลิกไปแล้ว)");
+            currentMovieTicketKey = null;
+            switchView('view-user-history');
+            return;
+        }
+
+        document.getElementById('ticket-movie-title').innerText = r.title || '-';
+        document.getElementById('ticket-datetime').innerText = `📅 ${r.date}  |  ⏱️ ${r.startTime}-${r.endTime}  |  🚪 ${r.room || '-'}`;
+        document.getElementById('ticket-seat').innerText = seat;
+
+        const qrPayload = `MOVIECLUB|${roundId}|${seat}`;
+        const qrContainer = document.getElementById('ticket-qr-container');
+        qrContainer.innerHTML = "";
+        new QRCode(qrContainer, { text: qrPayload, width: 180, height: 180, colorDark: "#4c1d95", colorLight: "#ffffff" });
+
+        const statusEl = document.getElementById('ticket-checkin-status');
+        const cancelBtn = document.getElementById('ticket-cancel-btn');
+        if (seatData.checkedIn) {
+            statusEl.innerHTML = '<span class="text-green-600">✅ เช็คอินเข้าห้องแล้ว</span>';
+            cancelBtn.classList.add('hidden-view');
+        } else {
+            statusEl.innerHTML = '<span class="text-gray-400">⏳ ยังไม่ได้เช็คอิน</span>';
+            cancelBtn.classList.remove('hidden-view');
+        }
+    }
+
+    function cancelMovieTicket() {
+        if (!currentMovieTicketKey) return;
+        if (!confirm("ยืนยันยกเลิกตั๋วนี้หรือไม่?\nที่นั่งจะว่างให้คนอื่นจองแทนทันที")) return;
+        const { roundId, seat } = currentMovieTicketKey;
+        movieSeatsRef.child(roundId).child(seat).remove()
+            .then(() => {
+                movieUserTicketsRef.child(currentUserId).child(roundId).remove();
+                showToast("✅ ยกเลิกตั๋วเรียบร้อยแล้ว");
+                currentMovieTicketKey = null;
+                switchView('view-user-history');
+            })
+            .catch((err) => {
+                console.error(err);
+                showToast("⚠️ ยกเลิกไม่สำเร็จ ลองใหม่อีกครั้ง");
+            });
+    }
+
+    function getMyMovieTickets() {
+        const tickets = [];
+        Object.keys(movieSeatsCache).forEach(roundId => {
+            const seats = movieSeatsCache[roundId] || {};
+            Object.keys(seats).forEach(seat => {
+                if (seats[seat].userId === currentUserId) {
+                    tickets.push({ roundId, seat, ...seats[seat] });
+                }
+            });
+        });
+        return tickets;
+    }
+
+    // ---------- จัดการรอบหนัง (Admin) ----------
+    function openMovieRoundForm(roundId) {
+        document.getElementById('movie-round-form').classList.remove('hidden-view');
+        if (roundId && movieRoundsCache[roundId]) {
+            const r = movieRoundsCache[roundId];
+            document.getElementById('movie-form-round-id').value = roundId;
+            document.getElementById('movie-form-title').value = r.title || '';
+            document.getElementById('movie-form-poster').value = r.posterUrl || '';
+            document.getElementById('movie-form-details').value = r.details || '';
+            document.getElementById('movie-form-date').value = r.date || '';
+            document.getElementById('movie-form-room').value = r.room || '';
+            document.getElementById('movie-form-start').value = r.startTime || '';
+            document.getElementById('movie-form-end').value = r.endTime || '';
+            document.getElementById('movie-form-rows').value = r.rows || 5;
+            document.getElementById('movie-form-cols').value = r.cols || 6;
+        } else {
+            document.getElementById('movie-form-round-id').value = '';
+            ['movie-form-title', 'movie-form-poster', 'movie-form-details', 'movie-form-room'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('movie-form-date').value = '';
+            document.getElementById('movie-form-start').value = '18:00';
+            document.getElementById('movie-form-end').value = '20:00';
+            document.getElementById('movie-form-rows').value = 5;
+            document.getElementById('movie-form-cols').value = 6;
+        }
+        document.getElementById('movie-round-form').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function closeMovieRoundForm() {
+        document.getElementById('movie-round-form').classList.add('hidden-view');
+    }
+
+    function saveMovieRound() {
+        const roundId = document.getElementById('movie-form-round-id').value;
+        const title = document.getElementById('movie-form-title').value.trim();
+        const posterUrl = document.getElementById('movie-form-poster').value.trim();
+        const details = document.getElementById('movie-form-details').value.trim();
+        const date = document.getElementById('movie-form-date').value;
+        const room = document.getElementById('movie-form-room').value.trim();
+        const startTime = document.getElementById('movie-form-start').value;
+        const endTime = document.getElementById('movie-form-end').value;
+        const rows = parseInt(document.getElementById('movie-form-rows').value, 10) || 5;
+        const cols = parseInt(document.getElementById('movie-form-cols').value, 10) || 6;
+
+        if (!title || !date || !room || !startTime || !endTime) {
+            return alert("⚠️ กรุณากรอกข้อมูลให้ครบ (ชื่อหนัง, วันที่, ห้อง, เวลาเริ่ม-จบ)");
+        }
+        // เช็คว่าวันที่เลือกเป็นวันอาทิตย์ (getDay() === 0)
+        if (new Date(date).getDay() !== 0) {
+            return alert("⚠️ Movie Club จัดเฉพาะวันอาทิตย์เท่านั้นครับ กรุณาเลือกวันที่ใหม่");
+        }
+
+        const roundData = { title, posterUrl, details, date, room, startTime, endTime, rows, cols, updatedAt: Date.now() };
+
+        const ref = roundId ? movieRoundsRef.child(roundId) : movieRoundsRef.push();
+        if (!roundId) roundData.createdAt = Date.now();
+
+        ref.update(roundData)
+            .then(() => {
+                showToast(roundId ? "✅ แก้ไขรอบหนังสำเร็จ" : "✅ เพิ่มรอบหนังใหม่สำเร็จ");
+                closeMovieRoundForm();
+            })
+            .catch((err) => {
+                console.error(err);
+                showToast("⚠️ บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง");
+            });
+    }
+
+    function deleteMovieRound(roundId) {
+        if (!confirm("ยืนยันลบรอบหนังนี้หรือไม่?\n⚠️ ตั๋วที่คนจองไว้ทั้งหมดของรอบนี้จะถูกลบไปด้วย")) return;
+        movieRoundsRef.child(roundId).remove()
+            .then(() => movieSeatsRef.child(roundId).remove())
+            .then(() => showToast("✅ ลบรอบหนังเรียบร้อยแล้ว"))
+            .catch((err) => {
+                console.error(err);
+                showToast("⚠️ ลบไม่สำเร็จ ลองใหม่อีกครั้ง");
+            });
+    }
+
+    function renderMovieAdminList() {
+        const container = document.getElementById('movie-admin-round-list');
+        container.innerHTML = "";
+        const rounds = Object.values(movieRoundsCache).sort((a, b) => (b.date + b.startTime).localeCompare(a.date + a.startTime));
+
+        if (rounds.length === 0) {
+            container.innerHTML = '<p class="text-center text-gray-400 text-sm py-6">ยังไม่มีรอบหนังในระบบ กด "+ เพิ่มรอบหนังใหม่" เพื่อเริ่มต้นครับ</p>';
+            return;
+        }
+
+        rounds.forEach(r => {
+            const seats = movieSeatsCache[r.id] || {};
+            const bookedCount = Object.keys(seats).length;
+            const checkedInCount = Object.values(seats).filter(s => s.checkedIn).length;
+            const total = totalSeatsOf(r);
+            const isPast = r.date < todayStr();
+            const card = document.createElement('div');
+            card.className = `bg-white rounded-lg shadow-sm border border-gray-200 p-3 ${isPast ? 'opacity-60' : ''}`;
+            card.innerHTML = `
+                <div class="flex gap-3">
+                    <img src="${r.posterUrl || 'https://placehold.co/60x84?text=No+Poster'}" class="w-14 h-20 object-cover bg-gray-200 rounded flex-shrink-0">
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold text-gray-800 text-sm truncate">${r.title || 'ยังไม่ได้ตั้งชื่อ'}</p>
+                        <p class="text-[11px] text-gray-500">📅 ${r.date} | ⏱️ ${r.startTime}-${r.endTime}</p>
+                        <p class="text-[11px] text-gray-500">🚪 ${r.room || '-'}</p>
+                        <p class="text-[11px] font-bold text-purple-700 mt-1">🎟️ ${bookedCount}/${total} ที่นั่ง &nbsp;|&nbsp; ✅ เช็คอินแล้ว ${checkedInCount} คน</p>
+                    </div>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button onclick="openMovieRoundForm('${r.id}')" class="flex-1 bg-gray-100 text-gray-700 py-1.5 rounded text-xs font-bold hover:bg-gray-200">✏️ แก้ไข</button>
+                    <button onclick="deleteMovieRound('${r.id}')" class="flex-1 bg-red-50 text-red-600 py-1.5 rounded text-xs font-bold hover:bg-red-100">🗑️ ลบ</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    // ---------- สแกน QR เช็คอิน (Admin) ----------
+    function startMovieScanner() {
+        document.getElementById('movie-scan-result').classList.add('hidden-view');
+        movieScannerInstance = new Html5Qrcode("movie-scanner-reader");
+        movieScannerInstance.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 220 },
+            (decodedText) => handleMovieQrScanned(decodedText),
+            () => {} // ยังไม่เจอ QR ในเฟรมนี้ - ไม่ต้องทำอะไร
+        ).catch((err) => {
+            console.error("Camera start error:", err);
+            showToast("⚠️ เปิดกล้องไม่สำเร็จ กรุณาอนุญาตสิทธิ์กล้อง");
+        });
+    }
+
+    function stopMovieScanner() {
+        if (movieScannerInstance) {
+            movieScannerInstance.stop().then(() => {
+                movieScannerInstance.clear();
+                movieScannerInstance = null;
+            }).catch(() => { movieScannerInstance = null; });
+        }
+    }
+
+    function handleMovieQrScanned(decodedText) {
+        if (!movieScannerInstance) return;
+        // หยุดกล้องชั่วคราวกันสแกนซ้ำรัวๆ ระหว่างแสดงผล
+        movieScannerInstance.pause(true);
+
+        const parts = (decodedText || "").split('|');
+        if (parts.length !== 3 || parts[0] !== 'MOVIECLUB') {
+            showMovieScanResult(null, "❌ นี่ไม่ใช่ QR ตั๋ว Movie Club ของระบบนี้ครับ");
+            return;
+        }
+        const [, roundId, seat] = parts;
+        const round = movieRoundsCache[roundId];
+        const seatData = (movieSeatsCache[roundId] || {})[seat];
+
+        if (!round || !seatData) {
+            showMovieScanResult(null, "❌ ไม่พบตั๋วนี้ในระบบ (อาจถูกยกเลิกไปแล้ว)");
+            return;
+        }
+        showMovieScanResult({ round, roundId, seat, seatData });
+    }
+
+    function showMovieScanResult(info, errorMsg) {
+        const box = document.getElementById('movie-scan-result');
+        box.classList.remove('hidden-view');
+
+        if (!info) {
+            box.innerHTML = `
+                <p class="text-center text-red-600 font-bold py-3">${errorMsg}</p>
+                <button onclick="resumeMovieScanner()" class="w-full bg-gray-800 text-white py-2 rounded-lg text-sm font-bold">📷 สแกนต่อ</button>
+            `;
+            return;
+        }
+
+        const { round, roundId, seat, seatData } = info;
+        box.innerHTML = `
+            <p class="text-xs text-gray-400 text-center mb-1">${round.title || '-'}</p>
+            <p class="text-2xl font-black text-center text-purple-700 mb-2">${seat}</p>
+            <p class="text-center text-sm font-bold text-gray-700 mb-1">👤 รหัสผู้จอง: ${seatData.userId}</p>
+            <p class="text-center text-xs text-gray-500 mb-4">${round.date} | ${round.startTime}-${round.endTime} | ${round.room || '-'}</p>
+            ${seatData.checkedIn
+                ? `<p class="text-center text-green-600 font-bold mb-3">✅ เช็คอินไปแล้วก่อนหน้านี้</p>`
+                : `<button onclick="confirmMovieCheckIn('${roundId}', '${seat}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold text-sm mb-3">✅ ยืนยันเข้าห้อง</button>`
+            }
+            <button onclick="resumeMovieScanner()" class="w-full bg-gray-100 text-gray-600 py-2 rounded-lg text-sm font-bold">📷 สแกนคนต่อไป</button>
+        `;
+    }
+
+    function confirmMovieCheckIn(roundId, seat) {
+        movieSeatsRef.child(roundId).child(seat).update({ checkedIn: true, checkedInAt: Date.now() })
+            .then(() => showToast("✅ เช็คอินสำเร็จ!"))
+            .catch((err) => {
+                console.error(err);
+                showToast("⚠️ เช็คอินไม่สำเร็จ ลองใหม่อีกครั้ง");
+            });
+    }
+
+    function resumeMovieScanner() {
+        document.getElementById('movie-scan-result').classList.add('hidden-view');
+        if (movieScannerInstance) movieScannerInstance.resume();
     }
 
     // ==========================================
@@ -1249,6 +1894,7 @@
     // 8. เริ่มต้นระบบ
     // ==========================================
     initFirebaseSync();
+    initMovieClubSync();
     updateClock();
     initDatePicker();
     initNotifications();
