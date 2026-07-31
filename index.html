@@ -328,10 +328,26 @@
                 <h2 class="font-bold text-gray-800 text-lg">📋 ประวัติการจองของฉัน</h2>
                 <button onclick="switchView('view-hub')" class="text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded-full font-bold">กลับ</button>
             </div>
+            <button onclick="switchView('view-my-schedule')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-bold text-sm mb-4 flex items-center justify-center gap-2">📅 ดูปฏิทินรวม "ตารางของฉัน"</button>
             <div id="user-history-container" class="space-y-3">
                 <!-- ข้อมูลจะโหลดจาก JS -->
             </div>
             <p id="user-history-empty" class="hidden-view text-center text-gray-400 text-sm py-10">คุณยังไม่มีประวัติการจอง</p>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW: ปฏิทินรวม "ตารางของฉัน" -->
+        <!-- ========================================== -->
+        <div id="view-my-schedule" class="hidden-view flex-1">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-bold text-gray-800 text-lg">📅 ตารางของฉัน</h2>
+                <button onclick="switchView('view-user-history')" class="text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded-full font-bold">กลับ</button>
+            </div>
+            <p class="text-xs text-gray-500 mb-4">รวมทุกกิจกรรมของคุณ — ห้องจอง/ปาร์ตี้, ตั๋วหนัง Movie Club, และชมรม เรียงตามวันที่ใกล้สุด</p>
+            <div id="my-schedule-container" class="space-y-4">
+                <!-- สร้างด้วย JavaScript -->
+            </div>
+            <p id="my-schedule-empty" class="hidden-view text-center text-gray-400 text-sm py-10">ยังไม่มีกิจกรรมอะไรในตารางของคุณเลยครับ</p>
         </div>
 
         <!-- ========================================== -->
@@ -905,7 +921,7 @@
     // 3. ระบบนำทาง (Navigation) & ระบบผู้ใช้งาน
     // ==========================================
     function switchView(viewId) {
-        ['view-role', 'view-login', 'view-admin', 'view-user-login', 'view-hub', 'view-building', 'view-map', 'view-user-history', 'view-party-room',
+        ['view-role', 'view-login', 'view-admin', 'view-user-login', 'view-hub', 'view-building', 'view-map', 'view-user-history', 'view-my-schedule', 'view-party-room',
          'view-movie-club', 'view-movie-round-detail', 'view-movie-ticket', 'view-movie-admin', 'view-movie-scanner',
          'view-club-list', 'view-club-create', 'view-club-detail', 'view-club-admin'].forEach(id => {
             const el = document.getElementById(id);
@@ -932,6 +948,7 @@
             renderHubWhatsNew();
         }
         if (viewId === 'view-user-history') renderUserHistory();
+        if (viewId === 'view-my-schedule') renderMySchedule();
         if (viewId === 'view-map') {
             initDatePicker();
             document.getElementById('booking-card').classList.add('hidden-view');
@@ -1358,9 +1375,106 @@
     }
 
     // ==========================================
-    // 4.3 ระบบ Movie Club — จองรอบหนัง, ผังที่นั่ง, ตั๋ว QR, จัดการรอบ (Admin), สแกนเช็คอิน
+    // 4.2.1 ปฏิทินรวม "ตารางของฉัน" — รวมห้องจอง/ปาร์ตี้ + ตั๋วหนัง + ชมรม เรียงตามวันที่
     // ==========================================
-    const movieRoundsRef = db.ref('movieClub/rounds');
+    function renderMySchedule() {
+        const container = document.getElementById('my-schedule-container');
+        const emptyMsg = document.getElementById('my-schedule-empty');
+        container.innerHTML = "";
+
+        const items = [];
+
+        // ห้องจอง/ปาร์ตี้
+        (loadBookings() || []).filter(b => isUserInBooking(b, currentUserId)).forEach(b => {
+            const startHour = parseInt(b.time.split('-')[0].split(':')[0], 10);
+            items.push({
+                date: b.date,
+                sortKey: b.date + b.time,
+                startHour,
+                icon: '🚪',
+                title: `ห้อง ${b.room}`,
+                timeLabel: b.time,
+                status: b.status,
+                onClick: isBookingActive(b) ? `openPartyRoom('${b.id}')` : null
+            });
+        });
+
+        // ตั๋วหนัง Movie Club
+        getMyMovieTickets().forEach(t => {
+            const r = movieRoundsCache[t.roundId];
+            if (!r) return;
+            items.push({
+                date: r.date,
+                sortKey: r.date + r.startTime,
+                startHour: parseInt(r.startTime.split(':')[0], 10),
+                icon: '🎬',
+                title: r.title || 'Movie Club',
+                timeLabel: `${r.startTime}-${r.endTime} | 💺 ${t.seat}`,
+                status: 'approved',
+                onClick: `openMovieTicket('${t.roundId}', '${t.seat}')`
+            });
+        });
+
+        // ชมรม
+        Object.values(clubsCache).filter(c => isUserInClub(c, currentUserId)).forEach(c => {
+            items.push({
+                date: c.date,
+                sortKey: c.date + c.startTime,
+                startHour: parseInt(c.startTime.split(':')[0], 10),
+                icon: '🎉',
+                title: c.name,
+                timeLabel: `${c.startTime}-${c.endTime}`,
+                status: c.status,
+                onClick: isClubActive(c) ? `openClubDetail('${c.id}')` : null
+            });
+        });
+
+        if (items.length === 0) {
+            emptyMsg.classList.remove('hidden-view');
+            return;
+        }
+        emptyMsg.classList.add('hidden-view');
+
+        items.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+        // จัดกลุ่มตามวันที่ ให้ดูเป็นปฏิทินแบบ agenda (เห็นหัววันชัดเจน)
+        const groups = {};
+        items.forEach(i => {
+            if (!groups[i.date]) groups[i.date] = [];
+            groups[i.date].push(i);
+        });
+
+        const today = todayStr();
+        Object.keys(groups).sort().forEach(date => {
+            const dateObj = new Date(date);
+            const thaiDays = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+            const dayLabel = `${thaiDays[dateObj.getDay()]} ${date}${date === today ? ' (วันนี้)' : ''}`;
+
+            const groupWrap = document.createElement('div');
+            groupWrap.innerHTML = `<p class="text-xs font-bold text-gray-500 mb-2 sticky top-16 bg-gray-100 py-1">${date === today ? '🔵' : '📅'} ${dayLabel}</p>`;
+            const groupTitle = groupWrap.firstElementChild;
+            container.appendChild(groupTitle);
+
+            groups[date].sort((a, b) => a.startHour - b.startHour).forEach(i => {
+                const card = document.createElement('div');
+                const clickable = !!i.onClick;
+                card.className = `bg-white p-3 rounded-lg shadow-sm border-l-4 border-indigo-400 mb-2 flex items-center justify-between gap-2 ${clickable ? 'cursor-pointer hover:shadow-md transition' : 'opacity-70'}`;
+                if (clickable) card.setAttribute('onclick', i.onClick);
+                card.innerHTML = `
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="text-xl flex-shrink-0">${i.icon}</span>
+                        <div class="min-w-0">
+                            <p class="text-sm font-bold text-gray-800 truncate">${i.title}</p>
+                            <p class="text-[11px] text-gray-500">⏱️ ${i.timeLabel}</p>
+                        </div>
+                    </div>
+                    ${statusBadge(i.status)}
+                `;
+                container.appendChild(card);
+            });
+        });
+    }
+
     const movieSeatsRef = db.ref('movieClub/seats');        // movieClub/seats/{roundId}/{seatLabel} = {userId, bookedAt, checkedIn}
     const movieUserTicketsRef = db.ref('movieClub/userTickets'); // ดัชนีย้อนกลับ (เพื่อความสะดวก ไม่ใช่จุดตรวจสอบหลัก)
 
