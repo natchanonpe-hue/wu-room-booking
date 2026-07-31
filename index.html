@@ -296,6 +296,14 @@
 
                     <div id="club-detail-members" class="space-y-1.5 max-h-40 overflow-y-auto my-3 border-t border-b border-gray-100 py-2"></div>
 
+                    <!-- 🎫 QR เช็คอินส่วนตัว -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 text-center">
+                        <p class="text-xs font-bold text-gray-500 mb-2">🎫 QR เช็คอินของฉัน (โชว์ให้เจ้าของชมรมสแกนหน้างาน)</p>
+                        <div id="club-detail-my-qr" class="flex justify-center mb-2"></div>
+                        <p id="club-detail-my-checkin-status" class="text-xs font-bold"></p>
+                    </div>
+                    <button id="club-detail-scan-btn" onclick="" class="hidden-view w-full bg-gray-900 hover:bg-black text-white py-2.5 rounded-lg font-bold text-sm mb-3">📷 สแกนเช็คอินสมาชิก</button>
+
                     <p id="club-detail-status-note" class="text-xs text-center text-gray-500 mb-3"></p>
                     <div id="club-detail-actions"></div>
                 </div>
@@ -546,6 +554,14 @@
                         <!-- รายชื่อสมาชิกสร้างด้วย JavaScript -->
                     </div>
 
+                    <!-- 🎫 QR เช็คอินส่วนตัว -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-center">
+                        <p class="text-xs font-bold text-gray-500 mb-2">🎫 QR เช็คอินของฉัน (โชว์ให้เจ้าของห้องสแกนหน้างาน)</p>
+                        <div id="party-room-my-qr" class="flex justify-center mb-2"></div>
+                        <p id="party-room-my-checkin-status" class="text-xs font-bold"></p>
+                    </div>
+                    <button id="party-room-scan-btn" onclick="openScannerFor('party', '')" class="hidden-view w-full bg-gray-900 hover:bg-black text-white py-2.5 rounded-lg font-bold text-sm mb-4">📷 สแกนเช็คอินสมาชิก</button>
+
                     <p id="party-room-status-note" class="text-xs text-center text-gray-500 mb-3"></p>
 
                     <div id="party-room-actions"></div>
@@ -702,6 +718,18 @@
             <div id="movie-scanner-reader" class="rounded-xl overflow-hidden shadow-md mb-4"></div>
 
             <div id="movie-scan-result" class="hidden-view bg-white rounded-xl shadow-md border border-gray-200 p-4"></div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW: สแกน QR เช็คอิน ปาร์ตี้/ชมรม (ใช้โดยเจ้าของห้อง/เจ้าของชมรม) -->
+        <!-- ========================================== -->
+        <div id="view-qr-scanner" class="hidden-view flex-1">
+            <button onclick="closeUnifiedScanner()" class="mb-3 text-sm text-blue-600 font-bold flex items-center gap-1">← กลับ</button>
+            <h2 class="text-lg font-bold text-gray-800 mb-3 text-center">📷 สแกน QR เช็คอินสมาชิก</h2>
+
+            <div id="qr-scanner-reader" class="rounded-xl overflow-hidden shadow-md mb-4"></div>
+
+            <div id="qr-scan-result" class="hidden-view bg-white rounded-xl shadow-md border border-gray-200 p-4"></div>
         </div>
 
     </main>
@@ -923,13 +951,14 @@
     function switchView(viewId) {
         ['view-role', 'view-login', 'view-admin', 'view-user-login', 'view-hub', 'view-building', 'view-map', 'view-user-history', 'view-my-schedule', 'view-party-room',
          'view-movie-club', 'view-movie-round-detail', 'view-movie-ticket', 'view-movie-admin', 'view-movie-scanner',
-         'view-club-list', 'view-club-create', 'view-club-detail', 'view-club-admin'].forEach(id => {
+         'view-club-list', 'view-club-create', 'view-club-detail', 'view-club-admin', 'view-qr-scanner'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.classList.add('hidden-view');
         });
 
         // ออกจากหน้าสแกนกล้องแล้ว ต้องปิดกล้องด้วยเสมอ ไม่งั้นกล้องจะค้างเปิดอยู่เบื้องหลัง
         if (viewId !== 'view-movie-scanner') stopMovieScanner();
+        if (viewId !== 'view-qr-scanner') stopUnifiedScanner();
 
         const headerTitle = document.getElementById('header-title');
         if (viewId === 'view-admin') headerTitle.innerText = "Admin Dashboard";
@@ -958,6 +987,7 @@
         if (viewId === 'view-movie-scanner') startMovieScanner();
         if (viewId === 'view-club-list') renderClubList();
         if (viewId === 'view-club-admin') setClubAdminTab(currentClubAdminTab);
+        if (viewId === 'view-qr-scanner') startUnifiedScanner();
     }
 
     function checkUserRole() {
@@ -1204,6 +1234,8 @@
             return;
         }
 
+        runNoShowAutoReleaseForBooking(booking); // เช็ค no-show ของห้องนี้ทุกครั้งที่เปิดดู
+
         const members = booking.members || [];
         const capacity = booking.capacity || ROOM_CAPACITY;
         const isOwner = booking.userId === currentUserId;
@@ -1219,9 +1251,25 @@
         membersBox.innerHTML = members.map(m => `
             <div class="flex items-center justify-between text-sm py-1 px-2 rounded ${m.userId === currentUserId ? 'bg-cyan-50 font-bold' : ''}">
                 <span>👤 ${m.userId} ${m.userId === booking.userId ? '<span class="text-[10px] text-amber-600 font-bold">(เจ้าของห้อง)</span>' : ''}</span>
-                ${m.userId === currentUserId ? '<span class="text-[10px] text-cyan-600">คุณ</span>' : ''}
+                <span class="text-[10px] ${m.checkedIn ? 'text-green-600 font-bold' : 'text-gray-400'}">${m.checkedIn ? '✅ เช็คอินแล้ว' : (m.userId === currentUserId ? 'คุณ' : '⏳ ยังไม่เช็คอิน')}</span>
             </div>
         `).join('') || '<p class="text-xs text-gray-400 text-center py-2">ยังไม่มีสมาชิก</p>';
+
+        // 🎫 QR เช็คอินส่วนตัวของฉัน
+        const myEntry = members.find(m => m.userId === currentUserId);
+        const qrWrap = document.getElementById('party-room-my-qr');
+        qrWrap.innerHTML = "";
+        if (myEntry) {
+            new QRCode(qrWrap, { text: `PARTY|${booking.id}|${currentUserId}`, width: 140, height: 140, colorDark: "#0e7490", colorLight: "#ffffff" });
+        }
+        document.getElementById('party-room-my-checkin-status').innerHTML = myEntry && myEntry.checkedIn
+            ? '<span class="text-green-600">✅ เช็คอินเข้าห้องแล้ว</span>'
+            : '<span class="text-gray-400">⏳ ยังไม่ได้เช็คอิน</span>';
+
+        // เจ้าของห้องเท่านั้นที่เห็นปุ่มสแกนเช็คอินสมาชิก
+        const scanBtn = document.getElementById('party-room-scan-btn');
+        scanBtn.classList.toggle('hidden-view', !isOwner);
+        if (isOwner) scanBtn.setAttribute('onclick', `openScannerFor('party', '${booking.id}')`);
 
         const statusNote = booking.status === 'pending'
             ? "⏳ การจองนี้กำลังรอแอดมินอนุมัติอยู่"
@@ -1276,7 +1324,7 @@
             currentMembers = currentMembers || [];
             if (currentMembers.length >= capacity) return; // undefined = ยกเลิก transaction (เต็มพอดี)
             if (currentMembers.some(m => m.userId === currentUserId)) return currentMembers;
-            currentMembers.push({ userId: currentUserId, joinedAt: Date.now() });
+            currentMembers.push({ userId: currentUserId, joinedAt: Date.now(), checkedIn: false });
             return currentMembers;
         }, (error, committed) => {
             if (error) {
@@ -1475,6 +1523,10 @@
         });
     }
 
+    // ==========================================
+    // 4.3 ระบบ Movie Club — จองรอบหนัง, ผังที่นั่ง, ตั๋ว QR, จัดการรอบ (Admin), สแกนเช็คอิน
+    // ==========================================
+    const movieRoundsRef = db.ref('movieClub/rounds');
     const movieSeatsRef = db.ref('movieClub/seats');        // movieClub/seats/{roundId}/{seatLabel} = {userId, bookedAt, checkedIn}
     const movieUserTicketsRef = db.ref('movieClub/userTickets'); // ดัชนีย้อนกลับ (เพื่อความสะดวก ไม่ใช่จุดตรวจสอบหลัก)
 
@@ -2007,6 +2059,200 @@
         return `⚠️ คุณมีนัดหมายที่ยังไม่เสร็จสิ้นอยู่แล้ว!\n\n${c.label}\nวันที่: ${c.date}\nเวลา: ${c.time}\nสถานะ: ${c.status === 'approved' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}\n\nกรุณารอให้ครบกำหนดเวลาเดิมก่อน หรือออก/ยกเลิกนัดหมายเดิมก่อน จึงจะทำรายการใหม่ได้`;
     }
 
+    // ==========================================
+    // 4.4 No-show Auto-release + QR เช็คอินรวม (ปาร์ตี้ห้องเรียน + ชมรม)
+    // หมายเหตุ: แอปนี้ไม่มี server ทำงานตลอดเวลา ระบบเช็ค no-show จะทำงานแบบ "lazy"
+    // คือตรวจตอนมีใครก็ตามเปิดดูรายการนั้น (หน้าตารางห้อง / รายการชมรม / หน้าห้อง / หน้าชมรม) ไม่ใช่ real-time เป๊ะวินาที
+    // ==========================================
+    const NO_SHOW_GRACE_MINUTES = 15; // ผ่านเวลาเริ่ม 15 นาทีแล้วยังไม่เช็คอิน = ถือว่า no-show
+
+    function isPastNoShowGrace(dateStr, startTimeStr) {
+        const [h, m] = (startTimeStr || '0:0').split(':').map(Number);
+        const startDate = new Date(dateStr + 'T' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':00');
+        const graceEnd = new Date(startDate.getTime() + NO_SHOW_GRACE_MINUTES * 60000);
+        return new Date() >= graceEnd;
+    }
+
+    // ห้องจอง/ปาร์ตี้: เจ้าของไม่มา -> ยกเลิกทั้งห้อง (ปล่อยห้องคืน) / สมาชิกไม่มา -> เอาออกจากห้อง (ปล่อยที่ว่างคืน)
+    function runNoShowAutoReleaseForBooking(b) {
+        if (!b || b.status !== 'approved') return;
+        if (!isPastNoShowGrace(b.date, (b.time || '0:0-0:0').split('-')[0])) return;
+        if (!isBookingActive(b)) return; // เลยเวลาจบไปแล้วตามธรรมชาติ ไม่ต้องยุ่ง
+
+        const members = b.members || [];
+        const ownerEntry = members.find(m => m.userId === b.userId);
+        if (ownerEntry && !ownerEntry.checkedIn) {
+            bookingsRef.child(b.id).update({ status: 'cancelled', autoCancelledNoShow: true });
+            return;
+        }
+        const hasNoShowMember = members.some(m => m.userId !== b.userId && !m.checkedIn);
+        if (!hasNoShowMember) return;
+        bookingsRef.child(b.id).child('members').transaction((current) => {
+            current = current || [];
+            return current.filter(m => m.userId === b.userId || m.checkedIn);
+        });
+    }
+
+    // ชมรม: ผู้สร้างไม่มา -> ยกเลิกทั้งชมรม / สมาชิกไม่มา -> เอาออกจากชมรม (ปล่อยที่ว่างคืน)
+    function runNoShowAutoReleaseForClub(c) {
+        if (!c || c.status !== 'approved') return;
+        if (!isPastNoShowGrace(c.date, c.startTime)) return;
+        if (!isClubActive(c)) return;
+
+        const members = c.members || [];
+        const creatorEntry = members.find(m => m.userId === c.creatorId);
+        if (creatorEntry && !creatorEntry.checkedIn) {
+            clubsRef.child(c.id).update({ status: 'cancelled', autoCancelledNoShow: true });
+            return;
+        }
+        const hasNoShowMember = members.some(m => m.userId !== c.creatorId && !m.checkedIn);
+        if (!hasNoShowMember) return;
+        clubsRef.child(c.id).child('members').transaction((current) => {
+            current = current || [];
+            return current.filter(m => m.userId === c.creatorId || m.checkedIn);
+        });
+    }
+
+    // ---------- QR Scanner รวม (เจ้าของห้อง/เจ้าของชมรม ใช้สแกนเช็คอินสมาชิกของตัวเอง) ----------
+    let unifiedScannerInstance = null;
+    let scannerContext = null; // { type: 'party'|'club', refId }
+
+    function openScannerFor(type, refId) {
+        scannerContext = { type, refId };
+        switchView('view-qr-scanner');
+    }
+
+    function closeUnifiedScanner() {
+        stopUnifiedScanner();
+        if (scannerContext && scannerContext.type === 'party') {
+            openPartyRoom(scannerContext.refId);
+        } else if (scannerContext && scannerContext.type === 'club') {
+            openClubDetail(scannerContext.refId);
+        } else {
+            switchView('view-user-history');
+        }
+    }
+
+    function startUnifiedScanner() {
+        document.getElementById('qr-scan-result').classList.add('hidden-view');
+        unifiedScannerInstance = new Html5Qrcode("qr-scanner-reader");
+        unifiedScannerInstance.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 220 },
+            (decodedText) => handleUnifiedQrScanned(decodedText),
+            () => {}
+        ).catch((err) => {
+            console.error("Camera start error:", err);
+            showToast("⚠️ เปิดกล้องไม่สำเร็จ กรุณาอนุญาตสิทธิ์กล้อง");
+        });
+    }
+
+    function stopUnifiedScanner() {
+        if (unifiedScannerInstance) {
+            unifiedScannerInstance.stop().then(() => {
+                unifiedScannerInstance.clear();
+                unifiedScannerInstance = null;
+            }).catch(() => { unifiedScannerInstance = null; });
+        }
+    }
+
+    function handleUnifiedQrScanned(decodedText) {
+        if (!unifiedScannerInstance) return;
+        unifiedScannerInstance.pause(true);
+
+        const parts = (decodedText || "").split('|');
+        if (parts.length !== 3) return showUnifiedScanResult(null, "❌ นี่ไม่ใช่ QR ของระบบนี้ครับ");
+        const [type, refId, userId] = parts;
+
+        if (type === 'PARTY') {
+            const booking = bookingsCache.find(b => b.id === refId);
+            const member = booking && (booking.members || []).find(m => m.userId === userId);
+            if (!booking || !member) return showUnifiedScanResult(null, "❌ ไม่พบข้อมูลการจองนี้");
+            if (scannerContext && scannerContext.refId && scannerContext.refId !== refId) {
+                return showUnifiedScanResult(null, "❌ QR นี้ไม่ใช่ของห้องที่คุณกำลังสแกนอยู่");
+            }
+            showUnifiedScanResult({ kind: 'party', room: booking.room, refId, userId, checkedIn: member.checkedIn });
+        } else if (type === 'CLUB') {
+            const club = clubsCache[refId];
+            const member = club && (club.members || []).find(m => m.userId === userId);
+            if (!club || !member) return showUnifiedScanResult(null, "❌ ไม่พบข้อมูลชมรมนี้");
+            if (scannerContext && scannerContext.refId && scannerContext.refId !== refId) {
+                return showUnifiedScanResult(null, "❌ QR นี้ไม่ใช่ของชมรมที่คุณกำลังสแกนอยู่");
+            }
+            showUnifiedScanResult({ kind: 'club', name: club.name, refId, userId, checkedIn: member.checkedIn });
+        } else {
+            showUnifiedScanResult(null, "❌ นี่ไม่ใช่ QR ของปาร์ตี้/ชมรมครับ");
+        }
+    }
+
+    function showUnifiedScanResult(info, errorMsg) {
+        const box = document.getElementById('qr-scan-result');
+        box.classList.remove('hidden-view');
+
+        if (!info) {
+            box.innerHTML = `
+                <p class="text-center text-red-600 font-bold py-3">${errorMsg}</p>
+                <button onclick="resumeUnifiedScanner()" class="w-full bg-gray-800 text-white py-2 rounded-lg text-sm font-bold">📷 สแกนต่อ</button>
+            `;
+            return;
+        }
+
+        const label = info.kind === 'party' ? `ห้อง ${info.room}` : info.name;
+        const confirmFn = info.kind === 'party' ? 'confirmPartyCheckIn' : 'confirmClubCheckIn';
+        box.innerHTML = `
+            <p class="text-xs text-gray-400 text-center mb-1">${label}</p>
+            <p class="text-2xl font-black text-center text-cyan-700 mb-2">${info.userId}</p>
+            ${info.checkedIn
+                ? `<p class="text-center text-green-600 font-bold mb-3">✅ เช็คอินไปแล้วก่อนหน้านี้</p>`
+                : `<button onclick="${confirmFn}('${info.refId}', '${info.userId}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold text-sm mb-3">✅ ยืนยันเช็คอิน</button>`
+            }
+            <button onclick="resumeUnifiedScanner()" class="w-full bg-gray-100 text-gray-600 py-2 rounded-lg text-sm font-bold">📷 สแกนคนต่อไป</button>
+        `;
+    }
+
+    function resumeUnifiedScanner() {
+        document.getElementById('qr-scan-result').classList.add('hidden-view');
+        if (unifiedScannerInstance) unifiedScannerInstance.resume();
+    }
+
+    function confirmPartyCheckIn(bookingId, userId) {
+        bookingsRef.child(bookingId).child('members').transaction((current) => {
+            current = current || [];
+            let changed = false;
+            const updated = current.map(m => {
+                if (m.userId === userId && !m.checkedIn) {
+                    changed = true;
+                    return { ...m, checkedIn: true, checkedInAt: Date.now() };
+                }
+                return m;
+            });
+            return changed ? updated : undefined;
+        }, (error, committed) => {
+            if (error) return showToast("⚠️ เช็คอินไม่สำเร็จ ลองใหม่อีกครั้ง");
+            if (!committed) return showToast("ℹ️ เช็คอินไปแล้วก่อนหน้านี้");
+            showToast("✅ เช็คอินสำเร็จ!");
+        });
+    }
+
+    function confirmClubCheckIn(clubId, userId) {
+        clubsRef.child(clubId).child('members').transaction((current) => {
+            current = current || [];
+            let changed = false;
+            const updated = current.map(m => {
+                if (m.userId === userId && !m.checkedIn) {
+                    changed = true;
+                    return { ...m, checkedIn: true, checkedInAt: Date.now() };
+                }
+                return m;
+            });
+            return changed ? updated : undefined;
+        }, (error, committed) => {
+            if (error) return showToast("⚠️ เช็คอินไม่สำเร็จ ลองใหม่อีกครั้ง");
+            if (!committed) return showToast("ℹ️ เช็คอินไปแล้วก่อนหน้านี้");
+            showToast("✅ เช็คอินสำเร็จ!");
+        });
+    }
+
     // ---------- ตรวจสอบห้องว่างทั้งช่วงเวลา (สำหรับสร้างชมรม ต้องว่างทุกชั่วโมงในช่วง) ----------
     function isRoomRangeAvailable(room, date, startHour, durationHours) {
         for (let h = startHour; h < startHour + durationHours; h++) {
@@ -2117,7 +2363,7 @@
             creatorId: currentUserId,
             status: "pending",
             createdAt: Date.now(),
-            members: [{ userId: currentUserId, joinedAt: Date.now() }]
+            members: [{ userId: currentUserId, joinedAt: Date.now(), checkedIn: false }]
         };
 
         clubsRef.push(newClub).then((ref) => {
@@ -2194,6 +2440,8 @@
             return;
         }
 
+        runNoShowAutoReleaseForClub(c); // เช็ค no-show ของชมรมนี้ทุกครั้งที่เปิดดู
+
         const members = c.members || [];
         const isCreator = c.creatorId === currentUserId;
         const isMember = isUserInClub(c, currentUserId);
@@ -2213,9 +2461,25 @@
         membersBox.innerHTML = members.map(m => `
             <div class="flex items-center justify-between text-sm py-1 px-2 rounded ${m.userId === currentUserId ? 'bg-purple-50 font-bold' : ''}">
                 <span>👤 ${m.userId} ${m.userId === c.creatorId ? '<span class="text-[10px] text-amber-600 font-bold">(ผู้สร้าง)</span>' : ''}</span>
-                ${m.userId === currentUserId ? '<span class="text-[10px] text-purple-600">คุณ</span>' : ''}
+                <span class="text-[10px] ${m.checkedIn ? 'text-green-600 font-bold' : 'text-gray-400'}">${m.checkedIn ? '✅ เช็คอินแล้ว' : (m.userId === currentUserId ? 'คุณ' : '⏳ ยังไม่เช็คอิน')}</span>
             </div>
         `).join('') || '<p class="text-xs text-gray-400 text-center py-2">ยังไม่มีผู้เข้าร่วม</p>';
+
+        // 🎫 QR เช็คอินส่วนตัวของฉัน (แสดงเฉพาะถ้าเป็นสมาชิก/ผู้สร้างอยู่แล้ว)
+        const myEntry = members.find(m => m.userId === currentUserId);
+        const qrWrap = document.getElementById('club-detail-my-qr');
+        qrWrap.innerHTML = "";
+        if (myEntry) {
+            new QRCode(qrWrap, { text: `CLUB|${c.id}|${currentUserId}`, width: 140, height: 140, colorDark: "#7e22ce", colorLight: "#ffffff" });
+        }
+        document.getElementById('club-detail-my-checkin-status').innerHTML = myEntry && myEntry.checkedIn
+            ? '<span class="text-green-600">✅ เช็คอินเข้าร่วมแล้ว</span>'
+            : (myEntry ? '<span class="text-gray-400">⏳ ยังไม่ได้เช็คอิน</span>' : '');
+
+        // เจ้าของชมรมเท่านั้นที่เห็นปุ่มสแกนเช็คอินสมาชิก
+        const scanBtn = document.getElementById('club-detail-scan-btn');
+        scanBtn.classList.toggle('hidden-view', !isCreator);
+        if (isCreator) scanBtn.setAttribute('onclick', `openScannerFor('club', '${c.id}')`);
 
         const statusNote = c.status === 'pending' ? "⏳ ชมรมนี้กำลังรอแอดมินอนุมัติอยู่" : "✅ ชมรมนี้ได้รับอนุมัติแล้ว";
         document.getElementById('club-detail-status-note').innerText = statusNote;
@@ -2250,7 +2514,7 @@
             currentMembers = currentMembers || [];
             if (currentMembers.length >= c.maxParticipants) return; // เต็มพอดี -> ยกเลิก transaction
             if (currentMembers.some(m => m.userId === currentUserId)) return currentMembers;
-            currentMembers.push({ userId: currentUserId, joinedAt: Date.now() });
+            currentMembers.push({ userId: currentUserId, joinedAt: Date.now(), checkedIn: false });
             return currentMembers;
         }, (error, committed) => {
             if (error) {
@@ -2700,7 +2964,7 @@
             createdAt: Date.now(),
             partyCode: partyCode,
             capacity: ROOM_CAPACITY,
-            members: [{ userId: currentUserId, joinedAt: Date.now() }] // เจ้าของห้องนับเป็นสมาชิกคนแรกอัตโนมัติ
+            members: [{ userId: currentUserId, joinedAt: Date.now(), checkedIn: false }] // เจ้าของห้องนับเป็นสมาชิกคนแรกอัตโนมัติ
         };
 
         // ใช้ push() แยก key ออกมาก่อน เพื่อรู้ id ล่วงหน้าไว้เปิดหน้าห้องปาร์ตี้ทันที
