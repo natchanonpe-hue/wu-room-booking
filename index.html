@@ -129,6 +129,18 @@
                 <button onclick="logoutUser()" class="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full font-bold hover:bg-red-200 transition">ออกจากระบบ</button>
             </div>
 
+            <!-- 🌟 การ์ดคะแนนจิตพิสัย -->
+            <div id="hub-score-card" class="rounded-xl p-4 mb-5 flex items-center justify-between shadow-sm bg-emerald-500 text-white">
+                <div>
+                    <p class="text-xs opacity-90">🌟 คะแนนจิตพิสัยของคุณ</p>
+                    <p id="hub-score-note" class="text-[11px] opacity-90 mt-0.5"></p>
+                </div>
+                <p id="hub-score-value" class="text-3xl font-black">100</p>
+            </div>
+
+            <!-- ⭐ แจ้งเตือนให้รีวิวคลับที่เพิ่งเข้าร่วมจบไป -->
+            <div id="hub-review-prompt-wrap" class="hidden-view mb-4"></div>
+
             <div class="space-y-3 mb-6">
                 <button onclick="switchView('view-building')" class="w-full bg-white p-5 rounded-xl shadow-sm border-2 border-blue-200 hover:border-blue-500 flex items-center gap-4 text-left transition">
                     <span class="text-4xl">📅</span>
@@ -204,6 +216,20 @@
                 <button onclick="openClubCreateForm()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3 py-2 rounded-full">+ สร้างชมรม</button>
             </div>
             <h2 class="text-lg font-bold text-gray-800 mb-4">🎉 ชมรม (Clubs)</h2>
+
+            <!-- 🏆 แบนเนอร์จัดอันดับคลับยอดนิยม -->
+            <div class="bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-xl p-4 mb-4 shadow-sm">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-sm">🏆 อันดับคลับยอดนิยม</h3>
+                    <div class="flex gap-1 bg-white/20 rounded-full p-0.5">
+                        <button id="club-rank-tab-month" onclick="setClubRankRange('month')" class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/40">เดือนนี้</button>
+                        <button id="club-rank-tab-all" onclick="setClubRankRange('all')" class="text-[10px] font-bold px-2.5 py-1 rounded-full">ตลอดกาล</button>
+                    </div>
+                </div>
+                <div id="club-ranking-list" class="space-y-1.5"></div>
+                <p id="club-ranking-empty" class="hidden-view text-center text-white/80 text-xs py-3">ยังไม่มีข้อมูลจัดอันดับตอนนี้ครับ</p>
+            </div>
+
             <div id="club-list-container" class="space-y-3"></div>
         </div>
 
@@ -326,6 +352,20 @@
             </div>
             <div id="club-admin-list" class="space-y-3"></div>
             <p id="club-admin-empty" class="hidden-view text-center text-gray-400 text-sm py-10">ไม่มีรายการในหมวดนี้</p>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW: รีวิวชมรม -->
+        <!-- ========================================== -->
+        <div id="view-club-review" class="hidden-view flex-1">
+            <button onclick="switchView('view-hub')" class="mb-3 text-sm text-blue-600 font-bold flex items-center gap-1">← กลับ</button>
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 p-5 text-center">
+                <p class="text-lg font-bold text-gray-800 mb-1">⭐ รีวิวกิจกรรมนี้กันหน่อย</p>
+                <p id="club-review-name" class="text-sm text-gray-500 mb-4">-</p>
+                <div id="club-review-stars" class="flex justify-center gap-2 mb-4 text-3xl"></div>
+                <textarea id="club-review-comment" rows="3" placeholder="เล่าความประทับใจสั้นๆ (ไม่บังคับ)" class="w-full p-2 border border-gray-300 rounded text-sm mb-4"></textarea>
+                <button onclick="submitClubReview()" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-lg font-bold text-sm">ส่งรีวิว</button>
+            </div>
         </div>
 
         <!-- ========================================== -->
@@ -951,7 +991,7 @@
     function switchView(viewId) {
         ['view-role', 'view-login', 'view-admin', 'view-user-login', 'view-hub', 'view-building', 'view-map', 'view-user-history', 'view-my-schedule', 'view-party-room',
          'view-movie-club', 'view-movie-round-detail', 'view-movie-ticket', 'view-movie-admin', 'view-movie-scanner',
-         'view-club-list', 'view-club-create', 'view-club-detail', 'view-club-admin', 'view-qr-scanner'].forEach(id => {
+         'view-club-list', 'view-club-create', 'view-club-detail', 'view-club-admin', 'view-qr-scanner', 'view-club-review'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.classList.add('hidden-view');
         });
@@ -971,10 +1011,13 @@
 
         document.getElementById(viewId).classList.remove('hidden-view');
 
-        if (viewId === 'view-admin') setAdminTab(currentAdminTab);
+        if (viewId === 'view-admin') { setAdminTab(currentAdminTab); runScoreSweep(); }
         if (viewId === 'view-hub') {
             document.getElementById('display-user-id-hub').innerText = currentUserId;
+            runScoreSweep();
             renderHubWhatsNew();
+            renderHubScore();
+            renderHubReviewPrompt();
         }
         if (viewId === 'view-user-history') renderUserHistory();
         if (viewId === 'view-my-schedule') renderMySchedule();
@@ -983,10 +1026,10 @@
             document.getElementById('booking-card').classList.add('hidden-view');
         }
         if (viewId === 'view-movie-club') renderMovieClubList();
-        if (viewId === 'view-movie-admin') renderMovieAdminList();
+        if (viewId === 'view-movie-admin') { renderMovieAdminList(); runScoreSweep(); }
         if (viewId === 'view-movie-scanner') startMovieScanner();
-        if (viewId === 'view-club-list') renderClubList();
-        if (viewId === 'view-club-admin') setClubAdminTab(currentClubAdminTab);
+        if (viewId === 'view-club-list') { renderClubList(); renderClubRanking(); }
+        if (viewId === 'view-club-admin') { setClubAdminTab(currentClubAdminTab); runScoreSweep(); }
         if (viewId === 'view-qr-scanner') startUnifiedScanner();
     }
 
@@ -1140,14 +1183,17 @@
     // เจ้าของห้องกดยกเลิก -> สมาชิกทุกคนถูกดีดออกอัตโนมัติ (เพราะ isBookingActive จะกลายเป็น false ทันทีที่สถานะเปลี่ยน)
     function cancelBooking(bookingId) {
         const booking = bookingsCache.find(b => b.id === bookingId);
+        const isLate = booking && isWithinLateCancelWindow(booking.date, (booking.time || '0:0-0:0').split('-')[0]);
+        const lateWarning = isLate ? `\n\n⚠️ ยกเลิกตอนนี้จะถูกหักคะแนน ${LATE_CANCEL_PENALTY} คะแนน (ยกเลิกก่อนเริ่มน้อยกว่า ${LATE_CANCEL_WINDOW_MIN} นาที)` : "";
         const confirmMsg = (booking && (booking.members || []).length > 1)
-            ? `ยืนยันยกเลิกห้องนี้หรือไม่?\n⚠️ มีสมาชิกร่วมอยู่ ${booking.members.length} คน ทุกคนจะถูกดีดออกจากห้องทันที`
-            : "ยืนยันยกเลิกการจองนี้หรือไม่?\n(ห้องจะว่างให้คนอื่นจองได้ทันที)";
+            ? `ยืนยันยกเลิกห้องนี้หรือไม่?\n⚠️ มีสมาชิกร่วมอยู่ ${booking.members.length} คน ทุกคนจะถูกดีดออกจากห้องทันที${lateWarning}`
+            : `ยืนยันยกเลิกการจองนี้หรือไม่?\n(ห้องจะว่างให้คนอื่นจองได้ทันที)${lateWarning}`;
         if (!confirm(confirmMsg)) return;
 
         bookingsRef.child(bookingId).update({ status: 'cancelled' })
             .then(() => {
                 showToast("✅ ยกเลิกการจองเรียบร้อยแล้ว");
+                if (isLate) adjustUserScore(currentUserId, -LATE_CANCEL_PENALTY);
                 // แจ้งเตือนสมาชิกทุกคน (ไม่รวมเจ้าของ) ว่าถูกดีดออกจากห้อง
                 if (booking) {
                     const members = booking.members || [];
@@ -1173,7 +1219,10 @@
 
     // สมาชิก (ไม่ใช่เจ้าของ) กดออกจากห้องเอง
     function leaveParty(bookingId) {
-        if (!confirm("ยืนยันออกจากห้องนี้หรือไม่?")) return;
+        const booking = bookingsCache.find(b => b.id === bookingId);
+        const isLate = booking && isWithinLateCancelWindow(booking.date, (booking.time || '0:0-0:0').split('-')[0]);
+        const lateWarning = isLate ? `\n\n⚠️ ออกตอนนี้จะถูกหักคะแนน ${LATE_CANCEL_PENALTY} คะแนน (ยกเลิกก่อนเริ่มน้อยกว่า ${LATE_CANCEL_WINDOW_MIN} นาที)` : "";
+        if (!confirm(`ยืนยันออกจากห้องนี้หรือไม่?${lateWarning}`)) return;
         bookingsRef.child(bookingId).child('members').transaction((currentMembers) => {
             currentMembers = currentMembers || [];
             return currentMembers.filter(m => m.userId !== currentUserId);
@@ -1183,6 +1232,7 @@
                 return;
             }
             showToast("👋 ออกจากห้องเรียบร้อยแล้ว");
+            if (isLate) adjustUserScore(currentUserId, -LATE_CANCEL_PENALTY);
             currentPartyBookingId = null;
             switchView('view-user-history');
         });
@@ -1691,6 +1741,9 @@
             openMovieTicket(roundId, existingSeat); // มีตั๋วรอบนี้อยู่แล้ว พาไปดูตั๋วเลย (1 คน 1 ที่นั่ง/รอบ)
             return;
         }
+        if (getUserScore(currentUserId) < MIN_SCORE_FOR_MOVIE_AND_CLUB_CREATE) {
+            return alert(`⚠️ คะแนนจิตพิสัยของคุณต่ำกว่า ${MIN_SCORE_FOR_MOVIE_AND_CLUB_CREATE} คะแนน\nไม่สามารถจองตั๋วหนังได้ชั่วคราว จนกว่าคะแนนจะเพิ่มขึ้น`);
+        }
         if (!selectedMovieSeat) return alert("⚠️ กรุณาเลือกที่นั่งก่อนครับ");
         const seat = selectedMovieSeat;
 
@@ -1755,12 +1808,16 @@
 
     function cancelMovieTicket() {
         if (!currentMovieTicketKey) return;
-        if (!confirm("ยืนยันยกเลิกตั๋วนี้หรือไม่?\nที่นั่งจะว่างให้คนอื่นจองแทนทันที")) return;
         const { roundId, seat } = currentMovieTicketKey;
+        const round = movieRoundsCache[roundId];
+        const isLate = round && isWithinLateCancelWindow(round.date, round.startTime);
+        const lateWarning = isLate ? `\n\n⚠️ ยกเลิกตอนนี้จะถูกหักคะแนน ${LATE_CANCEL_PENALTY} คะแนน (ยกเลิกก่อนเริ่มน้อยกว่า ${LATE_CANCEL_WINDOW_MIN} นาที)` : "";
+        if (!confirm(`ยืนยันยกเลิกตั๋วนี้หรือไม่?\nที่นั่งจะว่างให้คนอื่นจองแทนทันที${lateWarning}`)) return;
         movieSeatsRef.child(roundId).child(seat).remove()
             .then(() => {
                 movieUserTicketsRef.child(currentUserId).child(roundId).remove();
                 showToast("✅ ยกเลิกตั๋วเรียบร้อยแล้ว");
+                if (isLate) adjustUserScore(currentUserId, -LATE_CANCEL_PENALTY);
                 currentMovieTicketKey = null;
                 switchView('view-user-history');
             })
@@ -2292,6 +2349,9 @@
             if (error) return showToast("⚠️ เช็คอินไม่สำเร็จ ลองใหม่อีกครั้ง");
             if (!committed) return showToast("ℹ️ เช็คอินไปแล้วก่อนหน้านี้");
             showToast(`✅ เช็คอินสำเร็จ! (${formatCheckinTime(Date.now())})`);
+            if (userId !== c.creatorId) {
+                adjustUserScore(userId, CLUB_CHECKIN_REWARD); // +5 คะแนน สำหรับสมาชิกที่เช็คอินจริง (ไม่ใช่เจ้าของคลับ)
+            }
         });
     }
 
@@ -2302,6 +2362,306 @@
             if (!isRoomAvailableAt(room, date, h)) return false;
         }
         return true;
+    }
+
+    // ==========================================
+    // 4.5 ระบบคะแนนจิตพิสัย
+    // ทุกคนเริ่มที่ 100 คะแนน / no-show หรือยกเลิกกระชั้นชิด -10 / คะแนน<50 ดูหนัง-สร้างคลับไม่ได้
+    // เช็คอินคลับคนอื่น +5 / เปิดคลับจนจบ +2 ต่อหัวคนเช็คอินจริง
+    // หมายเหตุ: ไม่มี server ทำงานตลอดเวลา การตรวจ no-show/ให้รางวัลจบคลับ จึงเป็นแบบ "lazy"
+    // คือรันตอนมีใครก็ตามเปิดหน้า Hub/Admin/จัดการคลับ ไม่ใช่ real-time เป๊ะวินาที
+    // ==========================================
+    const DEFAULT_SCORE = 100;
+    const NOSHOW_PENALTY = 10;
+    const LATE_CANCEL_PENALTY = 10;
+    const LATE_CANCEL_WINDOW_MIN = 30; // ยกเลิกภายใน 30 นาทีก่อนเริ่ม = โดนหัก
+    const MIN_SCORE_FOR_MOVIE_AND_CLUB_CREATE = 50;
+    const CLUB_CHECKIN_REWARD = 5;      // ได้ตอนเช็คอินจริงเข้าคลับคนอื่น
+    const CLUB_HOST_REWARD_PER_HEAD = 2; // เจ้าของคลับได้ต่อหัวคนที่เช็คอินจริง เมื่อคลับจบครบเวลา
+
+    const userScoresRef = db.ref('userScores');
+    let userScoresCache = {};
+
+    function initScoresSync() {
+        userScoresRef.on('value', (snap) => {
+            userScoresCache = snap.val() || {};
+            if (!document.getElementById('view-hub').classList.contains('hidden-view')) renderHubScore();
+        }, (err) => console.error("Scores sync error:", err));
+    }
+
+    function getUserScore(userId) {
+        const v = userScoresCache[userId];
+        return (v === undefined || v === null) ? DEFAULT_SCORE : v;
+    }
+
+    function adjustUserScore(userId, delta) {
+        userScoresRef.child(userId).transaction((current) => {
+            const base = (current === null || current === undefined) ? DEFAULT_SCORE : current;
+            return base + delta;
+        });
+    }
+
+    function renderHubScore() {
+        const score = getUserScore(currentUserId);
+        const cardEl = document.getElementById('hub-score-card');
+        const valueEl = document.getElementById('hub-score-value');
+        const noteEl = document.getElementById('hub-score-note');
+        if (!cardEl) return;
+        valueEl.innerText = score;
+        if (score < MIN_SCORE_FOR_MOVIE_AND_CLUB_CREATE) {
+            cardEl.className = "rounded-xl p-4 mb-5 flex items-center justify-between shadow-sm bg-red-500 text-white";
+            noteEl.innerText = "⚠️ คะแนนต่ำกว่าเกณฑ์ ดูหนัง/สร้างชมรมไม่ได้ชั่วคราว";
+        } else if (score < 80) {
+            cardEl.className = "rounded-xl p-4 mb-5 flex items-center justify-between shadow-sm bg-amber-500 text-white";
+            noteEl.innerText = "เข้าร่วมกิจกรรมแล้วเช็คอินจริง เพื่อเพิ่มคะแนน";
+        } else {
+            cardEl.className = "rounded-xl p-4 mb-5 flex items-center justify-between shadow-sm bg-emerald-500 text-white";
+            noteEl.innerText = "🎉 คะแนนดีเยี่ยม ขอบคุณที่มีวินัยนะครับ";
+        }
+    }
+
+    // ---------- ยกเลิกกระชั้นชิด (< 30 นาทีก่อนเริ่ม) -> หักคะแนนทันที ----------
+    function isWithinLateCancelWindow(dateStr, startTimeStr) {
+        const [h, m] = (startTimeStr || '0:0').split(':').map(Number);
+        const startDate = new Date(dateStr + 'T' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':00');
+        const cutoff = new Date(startDate.getTime() - LATE_CANCEL_WINDOW_MIN * 60000);
+        return new Date() >= cutoff;
+    }
+
+    // ---------- No-show sweep + Host reward sweep (เช็คของ "ตัวเอง" ทุกครั้งที่เปิดหน้า Hub/Admin) ----------
+    function runScoreSweep() {
+        if (!currentUserId) return;
+        runNoShowScanForBookings();
+        runNoShowScanForClubs();
+        runNoShowScanForMovies();
+        runHostRewardScanForClubs();
+    }
+
+    function runNoShowScanForBookings() {
+        (loadBookings() || []).forEach(b => {
+            if (b.status !== 'approved' || isBookingActive(b)) return;
+            const members = b.members || [];
+            const mine = members.find(m => m.userId === currentUserId);
+            if (!mine || mine.checkedIn || mine.noShowPenaltyApplied) return;
+            bookingsRef.child(b.id).child('members').transaction((current) => {
+                current = current || [];
+                let changed = false;
+                const updated = current.map(m => {
+                    if (m.userId === currentUserId && !m.checkedIn && !m.noShowPenaltyApplied) {
+                        changed = true;
+                        return { ...m, noShowPenaltyApplied: true };
+                    }
+                    return m;
+                });
+                return changed ? updated : undefined;
+            }, (error, committed) => {
+                if (!error && committed) adjustUserScore(currentUserId, -NOSHOW_PENALTY);
+            });
+        });
+    }
+
+    function runNoShowScanForClubs() {
+        Object.values(clubsCache).forEach(c => {
+            if (c.status !== 'approved' || isClubActive(c)) return;
+            const members = c.members || [];
+            const mine = members.find(m => m.userId === currentUserId);
+            if (!mine || mine.checkedIn || mine.noShowPenaltyApplied) return;
+            clubsRef.child(c.id).child('members').transaction((current) => {
+                current = current || [];
+                let changed = false;
+                const updated = current.map(m => {
+                    if (m.userId === currentUserId && !m.checkedIn && !m.noShowPenaltyApplied) {
+                        changed = true;
+                        return { ...m, noShowPenaltyApplied: true };
+                    }
+                    return m;
+                });
+                return changed ? updated : undefined;
+            }, (error, committed) => {
+                if (!error && committed) adjustUserScore(currentUserId, -NOSHOW_PENALTY);
+            });
+        });
+    }
+
+    function isMovieRoundOver(r) {
+        const nowDate = todayStr();
+        if (r.date < nowDate) return true;
+        if (r.date > nowDate) return false;
+        const endHour = parseInt((r.endTime || '0:0').split(':')[0], 10);
+        return new Date().getHours() >= endHour;
+    }
+
+    function runNoShowScanForMovies() {
+        getMyMovieTickets().forEach(t => {
+            const r = movieRoundsCache[t.roundId];
+            if (!r || !isMovieRoundOver(r)) return;
+            if (t.checkedIn || t.noShowPenaltyApplied) return;
+            movieSeatsRef.child(t.roundId).child(t.seat).update({ noShowPenaltyApplied: true }).then(() => {
+                adjustUserScore(currentUserId, -NOSHOW_PENALTY);
+            });
+        });
+    }
+
+    // เปิดคลับจนจบครบเวลา (ไม่ถูกยกเลิก) -> เจ้าของได้ +2 ต่อหัวคนที่เช็คอินจริง
+    function runHostRewardScanForClubs() {
+        Object.values(clubsCache).forEach(c => {
+            if (c.creatorId !== currentUserId) return;
+            if (c.status !== 'approved' || isClubActive(c)) return;
+            if (c.hostRewardApplied) return;
+            clubsRef.child(c.id).transaction((current) => {
+                if (!current || current.hostRewardApplied) return; // ให้รางวัลไปแล้ว หรือข้อมูลหาย -> ยกเลิก
+                current.hostRewardApplied = true;
+                return current;
+            }, (error, committed, snapshot) => {
+                if (error || !committed) return;
+                const finalMembers = (snapshot.val() && snapshot.val().members) || [];
+                const cnt = finalMembers.filter(m => m.checkedIn && m.userId !== c.creatorId).length;
+                if (cnt > 0) adjustUserScore(currentUserId, cnt * CLUB_HOST_REWARD_PER_HEAD);
+            });
+        });
+    }
+
+    // ---------- รีวิวคลับ ----------
+    const clubReviewsRef = db.ref('clubReviews');
+    let clubReviewsCache = {};
+    let currentReviewClubId = null;
+    let selectedReviewRating = 0;
+
+    function initClubReviewsSync() {
+        clubReviewsRef.on('value', (snap) => {
+            clubReviewsCache = snap.val() || {};
+            if (!document.getElementById('view-hub').classList.contains('hidden-view')) renderHubReviewPrompt();
+            if (!document.getElementById('view-club-list').classList.contains('hidden-view')) renderClubRanking();
+        }, (err) => console.error("Club reviews sync error:", err));
+    }
+
+    function getUnreviewedAttendedClubs() {
+        const results = [];
+        Object.values(clubsCache).forEach(c => {
+            if (c.status !== 'approved' || isClubActive(c)) return;
+            const members = c.members || [];
+            const mine = members.find(m => m.userId === currentUserId);
+            if (!mine || !mine.checkedIn) return; // รีวิวได้เฉพาะคนที่เช็คอินจริงเท่านั้น
+            if (clubReviewsCache[c.id] && clubReviewsCache[c.id][currentUserId]) return; // รีวิวไปแล้ว
+            results.push(c);
+        });
+        return results.sort((a, b) => (b.date + b.startTime).localeCompare(a.date + a.startTime));
+    }
+
+    function renderHubReviewPrompt() {
+        const wrap = document.getElementById('hub-review-prompt-wrap');
+        if (!wrap) return;
+        const pending = getUnreviewedAttendedClubs();
+        if (pending.length === 0) {
+            wrap.classList.add('hidden-view');
+            wrap.innerHTML = "";
+            return;
+        }
+        wrap.classList.remove('hidden-view');
+        wrap.innerHTML = pending.map(c => `
+            <div class="bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-center justify-between gap-2 mb-2">
+                <div class="min-w-0">
+                    <p class="text-xs font-bold text-amber-800 truncate">⭐ รีวิว "${c.name}" กันหน่อย!</p>
+                    <p class="text-[10px] text-amber-600">คุณเพิ่งเข้าร่วมกิจกรรมนี้ไป (${c.date})</p>
+                </div>
+                <button onclick="openClubReviewForm('${c.id}')" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap">รีวิวเลย</button>
+            </div>
+        `).join('');
+    }
+
+    function openClubReviewForm(clubId) {
+        currentReviewClubId = clubId;
+        selectedReviewRating = 0;
+        const c = clubsCache[clubId];
+        document.getElementById('club-review-name').innerText = c ? c.name : '-';
+        document.getElementById('club-review-comment').value = "";
+        renderReviewStars();
+        switchView('view-club-review');
+    }
+
+    function renderReviewStars() {
+        const starsEl = document.getElementById('club-review-stars');
+        starsEl.innerHTML = [1, 2, 3, 4, 5].map(i => `
+            <span onclick="setReviewRating(${i})" class="cursor-pointer ${i <= selectedReviewRating ? 'text-amber-400' : 'text-gray-300'}">★</span>
+        `).join('');
+    }
+
+    function setReviewRating(n) {
+        selectedReviewRating = n;
+        renderReviewStars();
+    }
+
+    function submitClubReview() {
+        if (!currentReviewClubId) return;
+        if (selectedReviewRating === 0) return alert("⚠️ กรุณาให้คะแนนดาวก่อนครับ");
+        const comment = document.getElementById('club-review-comment').value.trim();
+        clubReviewsRef.child(currentReviewClubId).child(currentUserId).set({
+            rating: selectedReviewRating,
+            comment: comment,
+            createdAt: Date.now()
+        }).then(() => {
+            showToast("⭐ ขอบคุณสำหรับรีวิว!");
+            currentReviewClubId = null;
+            switchView('view-hub');
+        }).catch((err) => {
+            console.error(err);
+            showToast("⚠️ ส่งรีวิวไม่สำเร็จ ลองใหม่อีกครั้ง");
+        });
+    }
+
+    // ---------- แรงค์กิ้งคลับ ----------
+    let currentClubRankRange = 'month';
+
+    function setClubRankRange(range) {
+        currentClubRankRange = range;
+        renderClubRanking();
+    }
+
+    function computeClubStats(c) {
+        const members = c.members || [];
+        const checkedInCount = members.filter(m => m.checkedIn).length;
+        const reviews = clubReviewsCache[c.id] || {};
+        const ratings = Object.values(reviews).map(r => r.rating);
+        const avgRating = ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length) : 0;
+        const rankScore = checkedInCount * 10 + avgRating * 20;
+        return { checkedInCount, avgRating, rankScore };
+    }
+
+    function renderClubRanking() {
+        const monthTab = document.getElementById('club-rank-tab-month');
+        const allTab = document.getElementById('club-rank-tab-all');
+        if (!monthTab) return;
+        monthTab.classList.toggle('bg-white/40', currentClubRankRange === 'month');
+        allTab.classList.toggle('bg-white/40', currentClubRankRange === 'all');
+
+        const listEl = document.getElementById('club-ranking-list');
+        const emptyEl = document.getElementById('club-ranking-empty');
+
+        const now = new Date();
+        const currentMonthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+        let clubs = Object.values(clubsCache).filter(c => c.status === 'approved' && !isClubActive(c));
+        if (currentClubRankRange === 'month') clubs = clubs.filter(c => c.date.startsWith(currentMonthKey));
+
+        const withStats = clubs.map(c => ({ c, stats: computeClubStats(c) }))
+            .filter(x => x.stats.checkedInCount > 0)
+            .sort((a, b) => b.stats.rankScore - a.stats.rankScore)
+            .slice(0, 5);
+
+        if (withStats.length === 0) {
+            emptyEl.classList.remove('hidden-view');
+            listEl.innerHTML = "";
+            return;
+        }
+        emptyEl.classList.add('hidden-view');
+
+        const medals = ['🥇', '🥈', '🥉', '4.', '5.'];
+        listEl.innerHTML = withStats.map((x, i) => `
+            <div class="flex items-center justify-between bg-white/15 rounded-lg px-3 py-2 cursor-pointer" onclick="openClubDetail('${x.c.id}')">
+                <span class="text-xs font-bold truncate">${medals[i]} ${x.c.name}</span>
+                <span class="text-[10px] whitespace-nowrap ml-2">👥 ${x.stats.checkedInCount} &nbsp; ⭐ ${x.stats.avgRating.toFixed(1)}</span>
+            </div>
+        `).join('');
     }
 
     // ---------- ฟอร์มสร้างชมรม ----------
@@ -2372,6 +2732,11 @@
         }
         if (date < todayStr()) {
             errorEl.innerText = "⚠️ ไม่สามารถเลือกวันที่ผ่านไปแล้วได้ครับ";
+            errorEl.classList.remove('hidden-view');
+            return;
+        }
+        if (getUserScore(currentUserId) < MIN_SCORE_FOR_MOVIE_AND_CLUB_CREATE) {
+            errorEl.innerText = `⚠️ คะแนนจิตพิสัยของคุณต่ำกว่า ${MIN_SCORE_FOR_MOVIE_AND_CLUB_CREATE} คะแนน ไม่สามารถสร้างชมรมได้ชั่วคราว จนกว่าคะแนนจะเพิ่มขึ้น`;
             errorEl.classList.remove('hidden-view');
             return;
         }
@@ -2573,7 +2938,10 @@
     }
 
     function leaveClub(clubId) {
-        if (!confirm("ยืนยันออกจากชมรมนี้หรือไม่?")) return;
+        const c = clubsCache[clubId];
+        const isLate = c && isWithinLateCancelWindow(c.date, c.startTime);
+        const lateWarning = isLate ? `\n\n⚠️ ออกตอนนี้จะถูกหักคะแนน ${LATE_CANCEL_PENALTY} คะแนน (ยกเลิกก่อนเริ่มน้อยกว่า ${LATE_CANCEL_WINDOW_MIN} นาที)` : "";
+        if (!confirm(`ยืนยันออกจากชมรมนี้หรือไม่?${lateWarning}`)) return;
         clubsRef.child(clubId).child('members').transaction((currentMembers) => {
             currentMembers = currentMembers || [];
             return currentMembers.filter(m => m.userId !== currentUserId);
@@ -2583,6 +2951,7 @@
                 return;
             }
             showToast("👋 ออกจากชมรมเรียบร้อยแล้ว");
+            if (isLate) adjustUserScore(currentUserId, -LATE_CANCEL_PENALTY);
             currentClubId = null;
             switchView('view-club-list');
         });
@@ -2591,13 +2960,16 @@
     function cancelClub(clubId) {
         const c = clubsCache[clubId];
         const memberCount = c ? (c.members || []).length : 0;
+        const isLate = c && isWithinLateCancelWindow(c.date, c.startTime);
+        const lateWarning = isLate ? `\n\n⚠️ ยกเลิกตอนนี้จะถูกหักคะแนน ${LATE_CANCEL_PENALTY} คะแนน (ยกเลิกก่อนเริ่มน้อยกว่า ${LATE_CANCEL_WINDOW_MIN} นาที)` : "";
         const confirmMsg = memberCount > 1
-            ? `ยืนยันยกเลิกชมรมนี้หรือไม่?\n⚠️ มีสมาชิกร่วมอยู่ ${memberCount} คน ทุกคนจะถูกดีดออกทันที`
-            : "ยืนยันยกเลิกชมรมนี้หรือไม่?";
+            ? `ยืนยันยกเลิกชมรมนี้หรือไม่?\n⚠️ มีสมาชิกร่วมอยู่ ${memberCount} คน ทุกคนจะถูกดีดออกทันที${lateWarning}`
+            : `ยืนยันยกเลิกชมรมนี้หรือไม่?${lateWarning}`;
         if (!confirm(confirmMsg)) return;
 
         clubsRef.child(clubId).update({ status: 'cancelled' }).then(() => {
             showToast("✅ ยกเลิกชมรมเรียบร้อยแล้ว");
+            if (isLate) adjustUserScore(currentUserId, -LATE_CANCEL_PENALTY);
             if (c) {
                 (c.members || []).forEach(m => {
                     if (m.userId === c.creatorId) return;
@@ -3050,6 +3422,8 @@
     initFirebaseSync();
     initMovieClubSync();
     initClubsSync();
+    initScoresSync();
+    initClubReviewsSync();
     updateClock();
     initDatePicker();
     initNotifications();
