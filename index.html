@@ -576,7 +576,7 @@
             <button onclick="switchView('view-building')" class="mb-3 text-sm text-blue-600 font-bold flex items-center gap-1">← กลับ</button>
             <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl p-4 mb-4">
                 <h2 class="text-xl font-bold">🎬 Movie Club</h2>
-                <p class="text-xs text-purple-100 mt-1">ทุกวันอาทิตย์ - เลือกรอบที่อยากดู แล้วจองที่นั่งได้เลย</p>
+                <p class="text-xs text-purple-100 mt-1">เลือกรอบที่อยากดู แล้วจองที่นั่งได้เลย</p>
             </div>
             <div id="movie-club-list" class="space-y-3"></div>
             <p id="movie-club-empty" class="hidden-view text-center text-gray-400 text-sm py-10">ยังไม่มีรอบหนังที่เปิดให้จองตอนนี้ครับ</p>
@@ -669,7 +669,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block text-xs font-bold text-gray-600 mb-1">วันที่ฉาย (ต้องเป็นวันอาทิตย์)</label>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">วันที่ฉาย</label>
                         <input type="date" id="movie-form-date" class="w-full p-2 border border-gray-300 rounded text-sm">
                     </div>
                     <div>
@@ -1251,7 +1251,7 @@
         membersBox.innerHTML = members.map(m => `
             <div class="flex items-center justify-between text-sm py-1 px-2 rounded ${m.userId === currentUserId ? 'bg-cyan-50 font-bold' : ''}">
                 <span>👤 ${m.userId} ${m.userId === booking.userId ? '<span class="text-[10px] text-amber-600 font-bold">(เจ้าของห้อง)</span>' : ''}</span>
-                <span class="text-[10px] ${m.checkedIn ? 'text-green-600 font-bold' : 'text-gray-400'}">${m.checkedIn ? '✅ เช็คอินแล้ว' : (m.userId === currentUserId ? 'คุณ' : '⏳ ยังไม่เช็คอิน')}</span>
+                <span class="text-[10px] ${m.checkedIn ? 'text-green-600 font-bold' : 'text-gray-400'}">${m.checkedIn ? `✅ ${formatCheckinTime(m.checkedInAt)}` : (m.userId === currentUserId ? 'คุณ' : '⏳ ยังไม่เช็คอิน')}</span>
             </div>
         `).join('') || '<p class="text-xs text-gray-400 text-center py-2">ยังไม่มีสมาชิก</p>';
 
@@ -1263,7 +1263,7 @@
             new QRCode(qrWrap, { text: `PARTY|${booking.id}|${currentUserId}`, width: 140, height: 140, colorDark: "#0e7490", colorLight: "#ffffff" });
         }
         document.getElementById('party-room-my-checkin-status').innerHTML = myEntry && myEntry.checkedIn
-            ? '<span class="text-green-600">✅ เช็คอินเข้าห้องแล้ว</span>'
+            ? `<span class="text-green-600">✅ เช็คอินเข้าห้องแล้ว เมื่อ ${formatCheckinTime(myEntry.checkedInAt)}</span>`
             : '<span class="text-gray-400">⏳ ยังไม่ได้เช็คอิน</span>';
 
         // เจ้าของห้องเท่านั้นที่เห็นปุ่มสแกนเช็คอินสมาชิก
@@ -1745,7 +1745,7 @@
         const statusEl = document.getElementById('ticket-checkin-status');
         const cancelBtn = document.getElementById('ticket-cancel-btn');
         if (seatData.checkedIn) {
-            statusEl.innerHTML = '<span class="text-green-600">✅ เช็คอินเข้าห้องแล้ว</span>';
+            statusEl.innerHTML = `<span class="text-green-600">✅ เช็คอินเข้าห้องแล้ว เมื่อ ${formatCheckinTime(seatData.checkedInAt)}</span>`;
             cancelBtn.classList.add('hidden-view');
         } else {
             statusEl.innerHTML = '<span class="text-gray-400">⏳ ยังไม่ได้เช็คอิน</span>';
@@ -1840,10 +1840,6 @@
 
         if (!title || !date || !room || !startTime || !endTime) {
             return alert("⚠️ กรุณากรอกข้อมูลให้ครบ (ชื่อหนัง, วันที่, ห้อง, เวลาเริ่ม-จบ)");
-        }
-        // เช็คว่าวันที่เลือกเป็นวันอาทิตย์ (getDay() === 0)
-        if (new Date(date).getDay() !== 0) {
-            return alert("⚠️ Movie Club จัดเฉพาะวันอาทิตย์เท่านั้นครับ กรุณาเลือกวันที่ใหม่");
         }
 
         const roundData = { title, posterUrl, details, date, room, startTime, endTime, rows, cols, updatedAt: Date.now() };
@@ -1974,7 +1970,7 @@
             <p class="text-center text-sm font-bold text-gray-700 mb-1">👤 รหัสผู้จอง: ${seatData.userId}</p>
             <p class="text-center text-xs text-gray-500 mb-4">${round.date} | ${round.startTime}-${round.endTime} | ${round.room || '-'}</p>
             ${seatData.checkedIn
-                ? `<p class="text-center text-green-600 font-bold mb-3">✅ เช็คอินไปแล้วก่อนหน้านี้</p>`
+                ? `<p class="text-center text-green-600 font-bold mb-3">✅ เช็คอินไปแล้วเมื่อ ${formatCheckinTime(seatData.checkedInAt)}</p>`
                 : `<button onclick="confirmMovieCheckIn('${roundId}', '${seat}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold text-sm mb-3">✅ ยืนยันเข้าห้อง</button>`
             }
             <button onclick="resumeMovieScanner()" class="w-full bg-gray-100 text-gray-600 py-2 rounded-lg text-sm font-bold">📷 สแกนคนต่อไป</button>
@@ -1982,8 +1978,13 @@
     }
 
     function confirmMovieCheckIn(roundId, seat) {
+        const round = movieRoundsCache[roundId];
+        if (!round) return showToast("⚠️ ไม่พบข้อมูลรอบหนังนี้");
+        const windowStatus = getCheckinWindowStatus(round.date, round.startTime, round.endTime);
+        if (!windowStatus.ok) return alert(checkinWindowAlertMessage(windowStatus, round.date, round.startTime, round.endTime));
+
         movieSeatsRef.child(roundId).child(seat).update({ checkedIn: true, checkedInAt: Date.now() })
-            .then(() => showToast("✅ เช็คอินสำเร็จ!"))
+            .then(() => showToast(`✅ เช็คอินสำเร็จ! (${formatCheckinTime(Date.now())})`))
             .catch((err) => {
                 console.error(err);
                 showToast("⚠️ เช็คอินไม่สำเร็จ ลองใหม่อีกครั้ง");
@@ -2071,6 +2072,36 @@
         const startDate = new Date(dateStr + 'T' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':00');
         const graceEnd = new Date(startDate.getTime() + NO_SHOW_GRACE_MINUTES * 60000);
         return new Date() >= graceEnd;
+    }
+
+    const CHECKIN_EARLY_MINUTES = 15; // เช็คอินได้ตั้งแต่ 15 นาทีก่อนเริ่ม
+
+    // เช็คว่าตอนนี้อยู่ในช่วงเวลาที่อนุญาตให้เช็คอินได้หรือไม่ (ก่อนเริ่ม 15 นาที ถึง เวลาจบกิจกรรม)
+    function getCheckinWindowStatus(dateStr, startTimeStr, endTimeStr) {
+        const [sh, sm] = (startTimeStr || '0:0').split(':').map(Number);
+        const [eh, em] = (endTimeStr || '0:0').split(':').map(Number);
+        const startDate = new Date(dateStr + 'T' + String(sh).padStart(2, '0') + ':' + String(sm).padStart(2, '0') + ':00');
+        const endDate = new Date(dateStr + 'T' + String(eh).padStart(2, '0') + ':' + String(em).padStart(2, '0') + ':00');
+        const windowStart = new Date(startDate.getTime() - CHECKIN_EARLY_MINUTES * 60000);
+        const now = new Date();
+
+        if (now < windowStart) return { ok: false, reason: 'early' };   // ยังไม่ถึงเวลา
+        if (now > endDate) return { ok: false, reason: 'late' };        // หมดเวลากิจกรรมไปแล้ว
+        return { ok: true };
+    }
+
+    function checkinWindowAlertMessage(status, dateStr, startTimeStr, endTimeStr) {
+        if (status.reason === 'early') {
+            return `⏳ ยังไม่ถึงเวลาเช็คอินครับ\nเช็คอินได้ตั้งแต่ ${CHECKIN_EARLY_MINUTES} นาทีก่อนเริ่มกิจกรรม (${dateStr} ${startTimeStr})`;
+        }
+        return `⌛ หมดเวลาเช็คอินแล้วครับ\nกิจกรรมนี้จบไปแล้วตั้งแต่ ${dateStr} ${endTimeStr}`;
+    }
+
+    // แปลง timestamp เป็นเวลาไทยอ่านง่าย เช่น "14:32 น."
+    function formatCheckinTime(ts) {
+        if (!ts) return '';
+        const d = new Date(ts);
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} น.`;
     }
 
     // ห้องจอง/ปาร์ตี้: เจ้าของไม่มา -> ยกเลิกทั้งห้อง (ปล่อยห้องคืน) / สมาชิกไม่มา -> เอาออกจากห้อง (ปล่อยที่ว่างคืน)
@@ -2171,7 +2202,7 @@
             if (scannerContext && scannerContext.refId && scannerContext.refId !== refId) {
                 return showUnifiedScanResult(null, "❌ QR นี้ไม่ใช่ของห้องที่คุณกำลังสแกนอยู่");
             }
-            showUnifiedScanResult({ kind: 'party', room: booking.room, refId, userId, checkedIn: member.checkedIn });
+            showUnifiedScanResult({ kind: 'party', room: booking.room, refId, userId, checkedIn: member.checkedIn, checkedInAt: member.checkedInAt });
         } else if (type === 'CLUB') {
             const club = clubsCache[refId];
             const member = club && (club.members || []).find(m => m.userId === userId);
@@ -2179,7 +2210,7 @@
             if (scannerContext && scannerContext.refId && scannerContext.refId !== refId) {
                 return showUnifiedScanResult(null, "❌ QR นี้ไม่ใช่ของชมรมที่คุณกำลังสแกนอยู่");
             }
-            showUnifiedScanResult({ kind: 'club', name: club.name, refId, userId, checkedIn: member.checkedIn });
+            showUnifiedScanResult({ kind: 'club', name: club.name, refId, userId, checkedIn: member.checkedIn, checkedInAt: member.checkedInAt });
         } else {
             showUnifiedScanResult(null, "❌ นี่ไม่ใช่ QR ของปาร์ตี้/ชมรมครับ");
         }
@@ -2203,7 +2234,7 @@
             <p class="text-xs text-gray-400 text-center mb-1">${label}</p>
             <p class="text-2xl font-black text-center text-cyan-700 mb-2">${info.userId}</p>
             ${info.checkedIn
-                ? `<p class="text-center text-green-600 font-bold mb-3">✅ เช็คอินไปแล้วก่อนหน้านี้</p>`
+                ? `<p class="text-center text-green-600 font-bold mb-3">✅ เช็คอินไปแล้วเมื่อ ${formatCheckinTime(info.checkedInAt)}</p>`
                 : `<button onclick="${confirmFn}('${info.refId}', '${info.userId}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold text-sm mb-3">✅ ยืนยันเช็คอิน</button>`
             }
             <button onclick="resumeUnifiedScanner()" class="w-full bg-gray-100 text-gray-600 py-2 rounded-lg text-sm font-bold">📷 สแกนคนต่อไป</button>
@@ -2216,6 +2247,12 @@
     }
 
     function confirmPartyCheckIn(bookingId, userId) {
+        const booking = bookingsCache.find(b => b.id === bookingId);
+        if (!booking) return showToast("⚠️ ไม่พบข้อมูลการจองนี้");
+        const [startTime, endTime] = (booking.time || '0:0-0:0').split('-');
+        const windowStatus = getCheckinWindowStatus(booking.date, startTime, endTime);
+        if (!windowStatus.ok) return alert(checkinWindowAlertMessage(windowStatus, booking.date, startTime, endTime));
+
         bookingsRef.child(bookingId).child('members').transaction((current) => {
             current = current || [];
             let changed = false;
@@ -2230,11 +2267,16 @@
         }, (error, committed) => {
             if (error) return showToast("⚠️ เช็คอินไม่สำเร็จ ลองใหม่อีกครั้ง");
             if (!committed) return showToast("ℹ️ เช็คอินไปแล้วก่อนหน้านี้");
-            showToast("✅ เช็คอินสำเร็จ!");
+            showToast(`✅ เช็คอินสำเร็จ! (${formatCheckinTime(Date.now())})`);
         });
     }
 
     function confirmClubCheckIn(clubId, userId) {
+        const c = clubsCache[clubId];
+        if (!c) return showToast("⚠️ ไม่พบข้อมูลชมรมนี้");
+        const windowStatus = getCheckinWindowStatus(c.date, c.startTime, c.endTime);
+        if (!windowStatus.ok) return alert(checkinWindowAlertMessage(windowStatus, c.date, c.startTime, c.endTime));
+
         clubsRef.child(clubId).child('members').transaction((current) => {
             current = current || [];
             let changed = false;
@@ -2249,7 +2291,7 @@
         }, (error, committed) => {
             if (error) return showToast("⚠️ เช็คอินไม่สำเร็จ ลองใหม่อีกครั้ง");
             if (!committed) return showToast("ℹ️ เช็คอินไปแล้วก่อนหน้านี้");
-            showToast("✅ เช็คอินสำเร็จ!");
+            showToast(`✅ เช็คอินสำเร็จ! (${formatCheckinTime(Date.now())})`);
         });
     }
 
@@ -2397,7 +2439,7 @@
         movieCard.onclick = () => switchView('view-movie-club');
         movieCard.innerHTML = `
             <h3 class="font-bold text-lg">🎬 Movie Club</h3>
-            <p class="text-xs text-purple-100 mt-1">ชมรมหลักของระบบ — ดูรอบหนังและจองที่นั่งทุกวันอาทิตย์</p>
+            <p class="text-xs text-purple-100 mt-1">ชมรมหลักของระบบ — ดูรอบหนังและจองที่นั่งตามรอบที่แอดมินกำหนด</p>
         `;
         container.appendChild(movieCard);
 
@@ -2461,7 +2503,7 @@
         membersBox.innerHTML = members.map(m => `
             <div class="flex items-center justify-between text-sm py-1 px-2 rounded ${m.userId === currentUserId ? 'bg-purple-50 font-bold' : ''}">
                 <span>👤 ${m.userId} ${m.userId === c.creatorId ? '<span class="text-[10px] text-amber-600 font-bold">(ผู้สร้าง)</span>' : ''}</span>
-                <span class="text-[10px] ${m.checkedIn ? 'text-green-600 font-bold' : 'text-gray-400'}">${m.checkedIn ? '✅ เช็คอินแล้ว' : (m.userId === currentUserId ? 'คุณ' : '⏳ ยังไม่เช็คอิน')}</span>
+                <span class="text-[10px] ${m.checkedIn ? 'text-green-600 font-bold' : 'text-gray-400'}">${m.checkedIn ? `✅ ${formatCheckinTime(m.checkedInAt)}` : (m.userId === currentUserId ? 'คุณ' : '⏳ ยังไม่เช็คอิน')}</span>
             </div>
         `).join('') || '<p class="text-xs text-gray-400 text-center py-2">ยังไม่มีผู้เข้าร่วม</p>';
 
@@ -2473,7 +2515,7 @@
             new QRCode(qrWrap, { text: `CLUB|${c.id}|${currentUserId}`, width: 140, height: 140, colorDark: "#7e22ce", colorLight: "#ffffff" });
         }
         document.getElementById('club-detail-my-checkin-status').innerHTML = myEntry && myEntry.checkedIn
-            ? '<span class="text-green-600">✅ เช็คอินเข้าร่วมแล้ว</span>'
+            ? `<span class="text-green-600">✅ เช็คอินเข้าร่วมแล้ว เมื่อ ${formatCheckinTime(myEntry.checkedInAt)}</span>`
             : (myEntry ? '<span class="text-gray-400">⏳ ยังไม่ได้เช็คอิน</span>' : '');
 
         // เจ้าของชมรมเท่านั้นที่เห็นปุ่มสแกนเช็คอินสมาชิก
