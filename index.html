@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WU Room Booking System (Complete Edition)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <!-- Firebase SDK (compat build เพื่อให้ใช้ onclick="..." แบบเดิมในหน้า HTML ได้โดยไม่ต้องแก้ทั้งไฟล์) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -13,6 +16,28 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
+    :root {
+        --ink: #1E1B3A;         /* ข้อความหลัก อบอุ่นกว่าดำล้วน */
+        --ink-soft: #6B6693;    /* ข้อความรอง */
+        --brand: #4F3FF0;       /* ม่วง-อินดิโก้ สดใส เป็นสีหลักของแอป */
+        --brand-dark: #3B2FC7;
+        --surface: #ffffff;
+        --canvas: #F5F3FF;      /* พื้นหลังม่วงอ่อนมาก อุ่นตา */
+        --line: #EBE7FB;
+        --shadow-soft: 0 1px 2px rgba(30,27,58,.04), 0 6px 20px -8px rgba(79,63,240,.18);
+        --shadow-pop: 0 10px 30px -10px rgba(79,63,240,.35);
+    }
+    * { font-family: 'Plus Jakarta Sans', 'Noto Sans Thai', sans-serif; }
+    body { background: radial-gradient(ellipse 120% 60% at 50% -10%, #EDE9FE 0%, #F5F3FF 45%, #FAF9FF 100%); color: var(--ink); }
+    .app-card { background: var(--surface); border-radius: 1.25rem; box-shadow: var(--shadow-soft); border: 1px solid var(--line); }
+    .app-card-flat { background: var(--surface); border-radius: 1rem; border: 1px solid var(--line); }
+    .btn-brand { background: linear-gradient(135deg, var(--brand), var(--brand-dark)); color: #fff; border-radius: 1rem; font-weight: 700; box-shadow: var(--shadow-pop); transition: transform .15s ease, box-shadow .15s ease; }
+    .btn-brand:hover { transform: translateY(-1px); box-shadow: 0 14px 34px -10px rgba(79,63,240,.45); }
+    .btn-brand:active { transform: translateY(0); }
+    .pill { border-radius: 999px; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #D8D2F7; border-radius: 999px; }
+
     .map-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .hidden-view { display: none !important; }
     .time-slot { transition: all 0.2s; }
@@ -29,23 +54,23 @@
     .toast { animation: fadein 0.25s ease, fadeout 0.25s ease 2.3s; }
     @keyframes fadein { from{opacity:0; transform: translate(-50%,10px);} to{opacity:1; transform: translate(-50%,0);} }
     @keyframes fadeout { from{opacity:1;} to{opacity:0;} }
-    .tab-btn.active { background-color:#2563eb; color:#fff; }
+    .tab-btn.active { background-color: var(--brand); color:#fff; }
 </style>
 </head>
-<body class="bg-gray-100 font-sans min-h-screen flex flex-col items-center">
+<body class="font-sans min-h-screen flex flex-col items-center">
 
     <!-- ========================================== -->
     <!-- ส่วนหัว (Header) & นาฬิกา -->
     <!-- ========================================== -->
-    <header class="w-full max-w-md bg-blue-700 text-white p-4 shadow-md flex justify-between items-center rounded-b-xl sticky top-0 z-50">
+    <header class="w-full max-w-md text-white p-4 flex justify-between items-center sticky top-0 z-50" style="background: linear-gradient(135deg, var(--brand), var(--brand-dark)); box-shadow: 0 8px 24px -8px rgba(79,63,240,.45);">
         <div>
-            <h1 class="text-lg font-bold" id="header-title">WU Room Booking</h1>
-            <p class="text-[10px] text-blue-200">ระบบจองห้องเรียนล่วงหน้า</p>
+            <h1 class="text-lg font-extrabold tracking-tight" id="header-title">WU Room Booking</h1>
+            <p class="text-[10px] text-white/70">ระบบจองห้องเรียนล่วงหน้า</p>
         </div>
         <div class="flex items-center gap-2">
-            <button id="notify-toggle-btn" onclick="requestNotificationPermission()" class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1.5 rounded-lg shadow-sm whitespace-nowrap">🔕 เปิดแจ้งเตือน</button>
-            <div class="text-right bg-blue-800 px-3 py-1 rounded-lg border border-blue-600 shadow-inner">
-                <p class="text-[10px] text-blue-200">เวลาปัจจุบัน</p>
+            <button id="notify-toggle-btn" onclick="requestNotificationPermission()" class="bg-white/15 backdrop-blur text-white text-[10px] font-bold px-2.5 py-1.5 pill whitespace-nowrap border border-white/20">🔕 เปิดแจ้งเตือน</button>
+            <div class="text-right bg-white/15 backdrop-blur px-3 py-1 rounded-xl border border-white/20">
+                <p class="text-[10px] text-white/70">เวลาปัจจุบัน</p>
                 <p class="text-sm font-bold tracking-wider font-mono" id="live-clock">--:--:--</p>
             </div>
         </div>
@@ -57,12 +82,15 @@
         <!-- VIEW 1: หน้าเลือก Role -->
         <!-- ========================================== -->
         <div id="view-role" class="flex-1 flex flex-col justify-center items-center space-y-6 py-10">
-            <img src="https://cdn-icons-png.flaticon.com/512/3048/3048122.png" alt="Logo" class="w-24 h-24 mb-4 opacity-80">
-            <h2 class="text-xl font-bold text-gray-700">เข้าสู่ระบบในฐานะ</h2>
-            <button onclick="checkUserRole()" class="w-full bg-white border-2 border-blue-500 text-blue-600 hover:bg-blue-50 py-4 rounded-xl font-bold text-lg shadow-sm flex items-center justify-center gap-3">
+            <div class="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl" style="background:linear-gradient(135deg,var(--brand),var(--brand-dark)); box-shadow:var(--shadow-pop);">🏫</div>
+            <div class="text-center">
+                <h2 class="text-2xl font-extrabold" style="color:var(--ink)">เข้าสู่ระบบในฐานะ</h2>
+                <p class="text-xs mt-1" style="color:var(--ink-soft)">เลือกบทบาทของคุณเพื่อเริ่มใช้งาน</p>
+            </div>
+            <button onclick="checkUserRole()" class="w-full app-card py-4 px-5 font-bold text-lg flex items-center justify-center gap-3 transition hover:-translate-y-0.5" style="color:var(--brand);">
                 👨‍🎓 ผู้ใช้งานทั่วไป (นักศึกษา/อาจารย์)
             </button>
-            <button onclick="switchView('view-login')" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-4 rounded-xl font-bold text-lg shadow-sm flex items-center justify-center gap-3">
+            <button onclick="switchView('view-login')" class="w-full py-4 px-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 text-white transition hover:-translate-y-0.5" style="background:var(--ink); box-shadow:var(--shadow-soft);">
                 ⚙️ ผู้ดูแลระบบ (Admin)
             </button>
         </div>
@@ -71,11 +99,11 @@
         <!-- VIEW 2: หน้า Login ของ ผู้ใช้งานทั่วไป -->
         <!-- ========================================== -->
         <div id="view-user-login" class="hidden-view flex-1 flex flex-col justify-center py-10">
-            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">👨‍🎓 รหัสผู้ใช้งาน</h2>
-                <input type="text" id="user-id-login" placeholder="รหัสนักศึกษา/บุคลากร" class="w-full p-3 border border-gray-300 rounded-lg text-lg text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
-                <button onclick="loginUser()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold text-lg shadow">เข้าสู่ระบบ</button>
-                <button onclick="switchView('view-role')" class="w-full mt-3 text-gray-500 text-sm py-2 hover:bg-gray-100 rounded-lg">กลับหน้าแรก</button>
+            <div class="app-card p-6">
+                <h2 class="text-xl font-extrabold mb-4 flex items-center gap-2" style="color:var(--ink)">👨‍🎓 รหัสผู้ใช้งาน</h2>
+                <input type="text" id="user-id-login" placeholder="รหัสนักศึกษา/บุคลากร" class="w-full p-3 rounded-xl text-lg text-center tracking-widest focus:outline-none focus:ring-2 mb-4" style="border:1px solid var(--line); background:var(--canvas); --tw-ring-color: var(--brand);">
+                <button onclick="loginUser()" class="w-full btn-brand py-3 text-lg">เข้าสู่ระบบ</button>
+                <button onclick="switchView('view-role')" class="w-full mt-3 text-sm py-2 rounded-xl transition hover:bg-black/5" style="color:var(--ink-soft)">กลับหน้าแรก</button>
             </div>
         </div>
 
@@ -83,11 +111,11 @@
         <!-- VIEW 3: หน้า Login ของ Admin -->
         <!-- ========================================== -->
         <div id="view-login" class="hidden-view flex-1 flex flex-col justify-center py-10">
-            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">🔐 รหัสผ่าน Admin</h2>
-                <input type="password" id="admin-password" placeholder="ใส่รหัสผ่าน (0000)" class="w-full p-3 border border-gray-300 rounded-lg text-lg text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
-                <button onclick="loginAdmin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold text-lg shadow">เข้าสู่ระบบ</button>
-                <button onclick="switchView('view-role')" class="w-full mt-3 text-gray-500 text-sm py-2 hover:bg-gray-100 rounded-lg">กลับหน้าแรก</button>
+            <div class="app-card p-6">
+                <h2 class="text-xl font-extrabold mb-4 flex items-center gap-2" style="color:var(--ink)">🔐 รหัสผ่าน Admin</h2>
+                <input type="password" id="admin-password" placeholder="ใส่รหัสผ่าน (0000)" class="w-full p-3 rounded-xl text-lg text-center tracking-widest focus:outline-none focus:ring-2 mb-4" style="border:1px solid var(--line); background:var(--canvas); --tw-ring-color: var(--brand);">
+                <button onclick="loginAdmin()" class="w-full btn-brand py-3 text-lg">เข้าสู่ระบบ</button>
+                <button onclick="switchView('view-role')" class="w-full mt-3 text-sm py-2 rounded-xl transition hover:bg-black/5" style="color:var(--ink-soft)">กลับหน้าแรก</button>
             </div>
         </div>
 
@@ -100,15 +128,15 @@
                 <button onclick="switchView('view-role')" class="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full font-bold">ออกจากระบบ</button>
             </div>
 
-            <button onclick="switchView('view-movie-admin')" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-lg font-bold text-sm mb-3 flex items-center justify-center gap-2">🎬 จัดการ Movie Club</button>
-            <button onclick="switchView('view-club-admin')" class="w-full bg-gray-800 hover:bg-black text-white p-3 rounded-lg font-bold text-sm mb-4 flex items-center justify-center gap-2">🎉 จัดการชมรมผู้ใช้</button>
+            <button onclick="switchView('view-movie-admin')" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-xl font-bold text-sm mb-3 flex items-center justify-center gap-2">🎬 จัดการ Movie Club</button>
+            <button onclick="switchView('view-club-admin')" class="w-full bg-gray-800 hover:bg-black text-white p-3 rounded-xl font-bold text-sm mb-4 flex items-center justify-center gap-2">🎉 จัดการชมรมผู้ใช้</button>
 
             <!-- แท็บสลับสถานะ -->
-            <div class="flex gap-1 mb-4 bg-white p-1 rounded-lg shadow-sm border border-gray-200">
-                <button class="tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="pending" onclick="setAdminTab('pending')">⏳ รออนุมัติ</button>
-                <button class="tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="approved" onclick="setAdminTab('approved')">✅ อนุมัติแล้ว</button>
-                <button class="tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="rejected" onclick="setAdminTab('rejected')">❌ ไม่อนุมัติ</button>
-                <button class="tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="cancelled" onclick="setAdminTab('cancelled')">🚫 ยกเลิก</button>
+            <div class="flex gap-1 mb-4 bg-white p-1 rounded-xl shadow-sm border border-gray-200">
+                <button class="tab-btn flex-1 py-2 rounded-lg text-[10px] font-bold text-gray-600" data-tab="pending" onclick="setAdminTab('pending')">⏳ รออนุมัติ</button>
+                <button class="tab-btn flex-1 py-2 rounded-lg text-[10px] font-bold text-gray-600" data-tab="approved" onclick="setAdminTab('approved')">✅ อนุมัติแล้ว</button>
+                <button class="tab-btn flex-1 py-2 rounded-lg text-[10px] font-bold text-gray-600" data-tab="rejected" onclick="setAdminTab('rejected')">❌ ไม่อนุมัติ</button>
+                <button class="tab-btn flex-1 py-2 rounded-lg text-[10px] font-bold text-gray-600" data-tab="cancelled" onclick="setAdminTab('cancelled')">🚫 ยกเลิก</button>
             </div>
 
             <div id="admin-requests-container" class="space-y-3">
@@ -123,14 +151,14 @@
         <!-- ========================================== -->
         <!-- VIEW 4A: หน้า Hub - เลือกระหว่างจองห้อง หรือ จอยคลับ -->
         <!-- ========================================== -->
-        <div id="view-hub" class="hidden-view flex-1">
+        <div id="view-hub" class="hidden-view flex-1 w-full">
             <div class="flex justify-between items-center mb-5">
-                <p class="text-sm font-bold text-gray-700">บัญชี: <span id="display-user-id-hub" class="text-blue-600"></span></p>
-                <button onclick="logoutUser()" class="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full font-bold hover:bg-red-200 transition">ออกจากระบบ</button>
+                <p class="text-sm font-semibold" style="color:var(--ink-soft)">บัญชี: <span id="display-user-id-hub" class="font-bold" style="color:var(--brand)"></span></p>
+                <button onclick="logoutUser()" class="text-xs bg-rose-50 text-rose-600 px-3 py-1.5 pill font-bold hover:bg-rose-100 transition">ออกจากระบบ</button>
             </div>
 
             <!-- 🌟 การ์ดคะแนนจิตพิสัย -->
-            <div id="hub-score-card" class="rounded-xl p-4 mb-5 flex items-center justify-between shadow-sm bg-emerald-500 text-white">
+            <div id="hub-score-card" class="rounded-2xl p-4 mb-5 flex items-center justify-between text-white" style="background: linear-gradient(135deg, #10B981, #059669); box-shadow: var(--shadow-soft);">
                 <div>
                     <p class="text-xs opacity-90">🌟 คะแนนจิตพิสัยของคุณ</p>
                     <p id="hub-score-note" class="text-[11px] opacity-90 mt-0.5"></p>
@@ -142,26 +170,27 @@
             <div id="hub-review-prompt-wrap" class="hidden-view mb-4"></div>
 
             <div class="space-y-3 mb-6">
-                <button onclick="switchView('view-building')" class="w-full bg-white p-5 rounded-xl shadow-sm border-2 border-blue-200 hover:border-blue-500 flex items-center gap-4 text-left transition">
-                    <span class="text-4xl">📅</span>
+                <button onclick="switchView('view-building')" class="w-full app-card p-5 flex items-center gap-4 text-left transition hover:-translate-y-0.5" style="border-color:#DCD6FB;">
+                    <span class="text-3xl w-12 h-12 flex items-center justify-center rounded-2xl" style="background:#EEF0FF;">📅</span>
                     <div class="flex-1">
-                        <h3 class="font-bold text-blue-700 text-lg">จองห้องเรียน</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">เลือกอาคาร/ห้อง แล้วจองล่วงหน้าได้เลย</p>
+                        <h3 class="font-extrabold text-lg" style="color:var(--ink)">จองห้องเรียน</h3>
+                        <p class="text-xs mt-0.5" style="color:var(--ink-soft)">เลือกอาคาร/ห้อง แล้วจองล่วงหน้าได้เลย</p>
                     </div>
-                    <span class="text-blue-400 text-2xl">➔</span>
+                    <span class="text-2xl" style="color:var(--brand)">➔</span>
                 </button>
-                <button onclick="switchView('view-club-list')" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white p-5 rounded-xl shadow-sm flex items-center gap-4 text-left transition">
-                    <span class="text-4xl">🎉</span>
+                <button onclick="switchView('view-club-list')" class="w-full btn-brand p-5 flex items-center gap-4 text-left">
+                    <span class="text-3xl w-12 h-12 flex items-center justify-center rounded-2xl bg-white/15">🎉</span>
                     <div class="flex-1">
-                        <h3 class="font-bold text-lg">เข้าร่วมชมรม (Club)</h3>
-                        <p class="text-xs text-purple-100 mt-0.5">Movie Club, ชมรมที่คนอื่นสร้าง หรือสร้างชมรมของคุณเอง</p>
+                        <h3 class="font-extrabold text-lg">เข้าร่วมชมรม (Club)</h3>
+                        <p class="text-xs text-white/80 mt-0.5">Movie Club, ชมรมที่คนอื่นสร้าง หรือสร้างชมรมของคุณเอง</p>
                     </div>
                     <span class="text-2xl">➔</span>
                 </button>
-                <button onclick="switchView('view-user-history')" class="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 p-3 rounded-lg shadow-sm font-bold flex justify-between items-center hover:bg-indigo-100 transition">
+                <button onclick="switchView('view-user-history')" class="w-full app-card-flat p-3.5 font-bold flex justify-between items-center transition hover:-translate-y-0.5" style="color:var(--brand);">
                     📋 ประวัติและสถานะการจองของฉัน
                     <span class="text-xl">➔</span>
                 </button>
+
             </div>
 
             <!-- 📢 ป้ายแจ้งข่าว/อัปเดตล่าสุด -->
@@ -181,11 +210,11 @@
             <button onclick="switchView('view-hub')" class="mb-3 text-sm text-blue-600 font-bold flex items-center gap-1">← กลับ</button>
 
             <!-- 🔑 กรอกรหัสเข้าร่วมปาร์ตี้ห้อง -->
-            <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-3 mb-5">
+            <div class="bg-cyan-50 border border-cyan-200 rounded-xl p-3 mb-5">
                 <p class="text-xs font-bold text-cyan-800 mb-2">🔑 มีรหัสเข้าห้องอยู่แล้ว? กรอกที่นี่ได้เลย</p>
                 <div class="flex gap-2">
-                    <input type="text" id="join-code-input" maxlength="6" placeholder="กรอกรหัส 6 หลัก" class="flex-1 p-2 border border-cyan-300 rounded-lg text-sm text-center tracking-widest uppercase font-bold" oninput="this.value = this.value.toUpperCase()">
-                    <button onclick="joinPartyByCode(document.getElementById('join-code-input').value)" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 rounded-lg text-sm font-bold whitespace-nowrap">เข้าร่วม</button>
+                    <input type="text" id="join-code-input" maxlength="6" placeholder="กรอกรหัส 6 หลัก" class="flex-1 p-2 border border-cyan-300 rounded-xl text-sm text-center tracking-widest uppercase font-bold" oninput="this.value = this.value.toUpperCase()">
+                    <button onclick="joinPartyByCode(document.getElementById('join-code-input').value)" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 rounded-xl text-sm font-bold whitespace-nowrap">เข้าร่วม</button>
                 </div>
             </div>
 
@@ -289,7 +318,7 @@
                     <input type="number" id="club-form-max" min="2" max="100" value="20" class="w-full p-2 border border-gray-300 rounded text-sm">
                 </div>
                 <p id="club-form-error" class="hidden-view text-xs text-red-600 font-bold"></p>
-                <button onclick="submitNewClub()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg font-bold text-sm">📤 ส่งคำขอสร้างชมรม (รอแอดมินอนุมัติ)</button>
+                <button onclick="submitNewClub()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl font-bold text-sm">📤 ส่งคำขอสร้างชมรม (รอแอดมินอนุมัติ)</button>
             </div>
         </div>
 
@@ -323,12 +352,12 @@
                     <div id="club-detail-members" class="space-y-1.5 max-h-40 overflow-y-auto my-3 border-t border-b border-gray-100 py-2"></div>
 
                     <!-- 🎫 QR เช็คอินส่วนตัว -->
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 text-center">
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3 text-center">
                         <p class="text-xs font-bold text-gray-500 mb-2">🎫 QR เช็คอินของฉัน (โชว์ให้เจ้าของชมรมสแกนหน้างาน)</p>
                         <div id="club-detail-my-qr" class="flex justify-center mb-2"></div>
                         <p id="club-detail-my-checkin-status" class="text-xs font-bold"></p>
                     </div>
-                    <button id="club-detail-scan-btn" onclick="" class="hidden-view w-full bg-gray-900 hover:bg-black text-white py-2.5 rounded-lg font-bold text-sm mb-3">📷 สแกนเช็คอินสมาชิก</button>
+                    <button id="club-detail-scan-btn" onclick="" class="hidden-view w-full bg-gray-900 hover:bg-black text-white py-2.5 rounded-xl font-bold text-sm mb-3">📷 สแกนเช็คอินสมาชิก</button>
 
                     <p id="club-detail-status-note" class="text-xs text-center text-gray-500 mb-3"></p>
                     <div id="club-detail-actions"></div>
@@ -344,11 +373,11 @@
                 <h2 class="font-bold text-gray-800 text-lg">🎉 จัดการชมรมผู้ใช้</h2>
                 <button onclick="switchView('view-admin')" class="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-bold">← กลับแดชบอร์ด</button>
             </div>
-            <div class="flex gap-1 mb-4 bg-white p-1 rounded-lg shadow-sm border border-gray-200">
-                <button class="club-tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="pending" onclick="setClubAdminTab('pending')">⏳ รออนุมัติ</button>
-                <button class="club-tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="approved" onclick="setClubAdminTab('approved')">✅ อนุมัติแล้ว</button>
-                <button class="club-tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="rejected" onclick="setClubAdminTab('rejected')">❌ ไม่อนุมัติ</button>
-                <button class="club-tab-btn flex-1 py-2 rounded-md text-[10px] font-bold text-gray-600" data-tab="cancelled" onclick="setClubAdminTab('cancelled')">🚫 ยกเลิก</button>
+            <div class="flex gap-1 mb-4 bg-white p-1 rounded-xl shadow-sm border border-gray-200">
+                <button class="club-tab-btn flex-1 py-2 rounded-lg text-[10px] font-bold text-gray-600" data-tab="pending" onclick="setClubAdminTab('pending')">⏳ รออนุมัติ</button>
+                <button class="club-tab-btn flex-1 py-2 rounded-lg text-[10px] font-bold text-gray-600" data-tab="approved" onclick="setClubAdminTab('approved')">✅ อนุมัติแล้ว</button>
+                <button class="club-tab-btn flex-1 py-2 rounded-lg text-[10px] font-bold text-gray-600" data-tab="rejected" onclick="setClubAdminTab('rejected')">❌ ไม่อนุมัติ</button>
+                <button class="club-tab-btn flex-1 py-2 rounded-lg text-[10px] font-bold text-gray-600" data-tab="cancelled" onclick="setClubAdminTab('cancelled')">🚫 ยกเลิก</button>
             </div>
             <div id="club-admin-list" class="space-y-3"></div>
             <p id="club-admin-empty" class="hidden-view text-center text-gray-400 text-sm py-10">ไม่มีรายการในหมวดนี้</p>
@@ -364,7 +393,7 @@
                 <p id="club-review-name" class="text-sm text-gray-500 mb-4">-</p>
                 <div id="club-review-stars" class="flex justify-center gap-2 mb-4 text-3xl"></div>
                 <textarea id="club-review-comment" rows="3" placeholder="เล่าความประทับใจสั้นๆ (ไม่บังคับ)" class="w-full p-2 border border-gray-300 rounded text-sm mb-4"></textarea>
-                <button onclick="submitClubReview()" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-lg font-bold text-sm">ส่งรีวิว</button>
+                <button onclick="submitClubReview()" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl font-bold text-sm">ส่งรีวิว</button>
             </div>
         </div>
 
@@ -376,7 +405,7 @@
                 <h2 class="font-bold text-gray-800 text-lg">📋 ประวัติการจองของฉัน</h2>
                 <button onclick="switchView('view-hub')" class="text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded-full font-bold">กลับ</button>
             </div>
-            <button onclick="switchView('view-my-schedule')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-bold text-sm mb-4 flex items-center justify-center gap-2">📅 ดูปฏิทินรวม "ตารางของฉัน"</button>
+            <button onclick="switchView('view-my-schedule')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl font-bold text-sm mb-4 flex items-center justify-center gap-2">📅 ดูปฏิทินรวม "ตารางของฉัน"</button>
             <div id="user-history-container" class="space-y-3">
                 <!-- ข้อมูลจะโหลดจาก JS -->
             </div>
@@ -404,17 +433,17 @@
         <div id="view-map" class="hidden-view flex-1">
             <button onclick="switchView('view-building')" class="mb-3 text-sm text-blue-600 font-bold flex items-center gap-1">← กลับ</button>
 
-            <div id="building-status-alert" class="bg-red-100 text-red-700 p-3 rounded-lg shadow-sm mb-3 text-sm font-bold text-center border border-red-300">
+            <div id="building-status-alert" class="bg-red-100 text-red-700 p-3 rounded-xl shadow-sm mb-3 text-sm font-bold text-center border border-red-300">
                 🔴 ขณะนี้อยู่นอกเวลาทำการ
             </div>
 
-            <div class="bg-white p-3 rounded-lg shadow-sm mb-4 border border-gray-200 flex items-center justify-between gap-3">
+            <div class="bg-white p-3 rounded-xl shadow-sm mb-4 border border-gray-200 flex items-center justify-between gap-3">
                 <label for="booking-date" class="text-xs font-bold text-gray-600 whitespace-nowrap">📅 เลือกวันที่จอง</label>
-                <input type="date" id="booking-date" class="flex-1 p-2 border border-gray-300 rounded-lg text-sm" onchange="onDateChange()">
+                <input type="date" id="booking-date" class="flex-1 p-2 border border-gray-300 rounded-xl text-sm" onchange="onDateChange()">
             </div>
 
             <!-- แผนผัง (อิงตามภาพ 100%) -->
-            <div class="map-container bg-white pt-4 pb-0 rounded-lg shadow-md mb-6 border border-gray-200" id="floor-plan-container">
+            <div class="map-container bg-white pt-4 pb-0 rounded-xl shadow-md mb-6 border border-gray-200" id="floor-plan-container">
                 <div class="w-[1100px] relative mx-auto pb-0" id="interactive-map">
                     
                     <!-- โซนบน -->
@@ -522,7 +551,7 @@
             </div>
 
             <!-- กล่องตารางเวลา & การจอง -->
-            <div id="booking-card" class="bg-white p-5 rounded-lg shadow-md border border-gray-200 hidden-view mb-10">
+            <div id="booking-card" class="bg-white p-5 rounded-xl shadow-md border border-gray-200 hidden-view mb-10">
                 <h3 class="text-lg font-bold text-gray-800 border-b pb-2 mb-3">
                     ตารางเวลาห้อง: <span id="selected-room-name" class="text-blue-600">NGxxxx</span>
                     <span class="block text-xs font-normal text-gray-500 mt-1">วันที่: <span id="selected-date-label">-</span></span>
@@ -544,18 +573,18 @@
                 </div>
 
                 <!-- 💡 กล่องแนะนำห้องทางเลือก (โผล่เมื่อกดช่องที่ไม่ว่าง) -->
-                <div id="room-suggestion-box" class="hidden-view bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <div id="room-suggestion-box" class="hidden-view bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
                     <!-- เนื้อหาสร้างด้วย JavaScript -->
                 </div>
 
                 <!-- ฟอร์มกรอกข้อมูล -->
-                <div id="booking-form" class="space-y-4 mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100 hidden-view">
+                <div id="booking-form" class="space-y-4 mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 hidden-view">
                     <p class="text-sm text-blue-800 font-bold mb-2">✅ คุณเลือกเวลา: <span id="display-selected-time" class="text-blue-600 underline">--:--</span></p>
                     <div>
                         <label class="block text-xs font-bold text-gray-600 mb-1">เหตุผลการใช้งาน</label>
                         <textarea id="booking-reason" rows="2" placeholder="ระบุเหตุผล (เช่น ติวหนังสือ, ทำงานกลุ่ม)" class="w-full p-2 border border-gray-300 rounded text-sm bg-white"></textarea>
                     </div>
-                    <button onclick="submitBooking()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-bold text-sm">ยืนยันการจองล่วงหน้า</button>
+                    <button onclick="submitBooking()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold text-sm">ยืนยันการจองล่วงหน้า</button>
                 </div>
             </div>
         </div>
@@ -577,7 +606,7 @@
                     <p class="text-xs font-bold text-gray-500 mb-1 text-center">🔑 รหัสเข้าร่วมห้องนี้ (แชร์ให้เพื่อนได้เลย)</p>
                     <div class="flex items-center gap-2 justify-center mb-4">
                         <p id="party-room-code" class="text-3xl font-black tracking-[0.3em] text-cyan-700">------</p>
-                        <button onclick="copyPartyCode()" class="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-2 py-1.5 rounded-lg">📋 คัดลอก</button>
+                        <button onclick="copyPartyCode()" class="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-2 py-1.5 rounded-xl">📋 คัดลอก</button>
                     </div>
 
                     <div class="mb-4">
@@ -595,12 +624,12 @@
                     </div>
 
                     <!-- 🎫 QR เช็คอินส่วนตัว -->
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-center">
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-4 text-center">
                         <p class="text-xs font-bold text-gray-500 mb-2">🎫 QR เช็คอินของฉัน (โชว์ให้เจ้าของห้องสแกนหน้างาน)</p>
                         <div id="party-room-my-qr" class="flex justify-center mb-2"></div>
                         <p id="party-room-my-checkin-status" class="text-xs font-bold"></p>
                     </div>
-                    <button id="party-room-scan-btn" onclick="openScannerFor('party', '')" class="hidden-view w-full bg-gray-900 hover:bg-black text-white py-2.5 rounded-lg font-bold text-sm mb-4">📷 สแกนเช็คอินสมาชิก</button>
+                    <button id="party-room-scan-btn" onclick="openScannerFor('party', '')" class="hidden-view w-full bg-gray-900 hover:bg-black text-white py-2.5 rounded-xl font-bold text-sm mb-4">📷 สแกนเช็คอินสมาชิก</button>
 
                     <p id="party-room-status-note" class="text-xs text-center text-gray-500 mb-3"></p>
 
@@ -651,7 +680,7 @@
 
                 <div class="mt-4 pt-3 border-t border-gray-100">
                     <p class="text-sm text-gray-600 text-center mb-3">ที่นั่งที่เลือก: <span id="movie-selected-seat-label" class="font-bold text-purple-700">ยังไม่ได้เลือก</span></p>
-                    <button onclick="bookMovieSeat()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg font-bold text-sm">🎟️ จองที่นั่งนี้</button>
+                    <button onclick="bookMovieSeat()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl font-bold text-sm">🎟️ จองที่นั่งนี้</button>
                 </div>
             </div>
         </div>
@@ -676,7 +705,7 @@
                     <p class="text-xs text-gray-400 mb-4">แสดง QR นี้ให้แอดมินสแกนที่หน้าห้องฉาย</p>
                     <p id="ticket-checkin-status" class="text-sm font-bold mb-4"></p>
 
-                    <button onclick="cancelMovieTicket()" id="ticket-cancel-btn" class="w-full bg-red-50 border border-red-300 text-red-600 py-2 rounded-lg text-xs font-bold hover:bg-red-100">🚫 ยกเลิกตั๋วนี้</button>
+                    <button onclick="cancelMovieTicket()" id="ticket-cancel-btn" class="w-full bg-red-50 border border-red-300 text-red-600 py-2 rounded-xl text-xs font-bold hover:bg-red-100">🚫 ยกเลิกตั๋วนี้</button>
                 </div>
             </div>
         </div>
@@ -690,10 +719,10 @@
                 <button onclick="switchView('view-admin')" class="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-bold">← กลับแดชบอร์ด</button>
             </div>
 
-            <button onclick="switchView('view-movie-scanner')" class="w-full bg-gray-900 hover:bg-black text-white p-3 rounded-lg font-bold text-sm mb-3">📷 สแกน QR เช็คอินผู้ชม</button>
-            <button onclick="openMovieRoundForm()" class="w-full bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-lg font-bold text-sm mb-4">+ เพิ่มรอบหนังใหม่</button>
+            <button onclick="switchView('view-movie-scanner')" class="w-full bg-gray-900 hover:bg-black text-white p-3 rounded-xl font-bold text-sm mb-3">📷 สแกน QR เช็คอินผู้ชม</button>
+            <button onclick="openMovieRoundForm()" class="w-full bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-xl font-bold text-sm mb-4">+ เพิ่มรอบหนังใหม่</button>
 
-            <div id="movie-round-form" class="hidden-view bg-white p-4 rounded-lg shadow-md border border-gray-200 mb-4 space-y-3">
+            <div id="movie-round-form" class="hidden-view bg-white p-4 rounded-xl shadow-md border border-gray-200 mb-4 space-y-3">
                 <input type="hidden" id="movie-form-round-id">
                 <div>
                     <label class="block text-xs font-bold text-gray-600 mb-1">ชื่อหนัง</label>
@@ -740,8 +769,8 @@
                     </div>
                 </div>
                 <div class="flex gap-2 pt-2">
-                    <button onclick="saveMovieRound()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-bold">💾 บันทึก</button>
-                    <button onclick="closeMovieRoundForm()" class="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg text-sm font-bold">ยกเลิก</button>
+                    <button onclick="saveMovieRound()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-xl text-sm font-bold">💾 บันทึก</button>
+                    <button onclick="closeMovieRoundForm()" class="flex-1 bg-gray-100 text-gray-600 py-2 rounded-xl text-sm font-bold">ยกเลิก</button>
                 </div>
             </div>
 
@@ -775,7 +804,7 @@
     </main>
 
     <!-- Toast แจ้งเตือนแบบลอย -->
-    <div id="toast" class="hidden-view fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg z-50 toast"></div>
+    <div id="toast" class="hidden-view fixed bottom-6 left-1/2 -translate-x-1/2 text-white text-sm font-bold px-4 py-2.5 pill z-50 toast" style="background:var(--ink); box-shadow:0 10px 30px -8px rgba(30,27,58,.5);"></div>
 
 <script>
     // ==========================================
@@ -939,10 +968,10 @@
         if (!btn) return;
         if (notificationsEnabled) {
             btn.innerText = "🔔 แจ้งเตือนเปิดอยู่";
-            btn.className = "bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1.5 rounded-lg shadow-sm whitespace-nowrap";
+            btn.className = "bg-emerald-400/90 text-emerald-950 text-[10px] font-bold px-2.5 py-1.5 pill whitespace-nowrap border border-white/20";
         } else {
             btn.innerText = "🔕 เปิดแจ้งเตือน";
-            btn.className = "bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1.5 rounded-lg shadow-sm whitespace-nowrap";
+            btn.className = "bg-white/15 backdrop-blur text-white text-[10px] font-bold px-2.5 py-1.5 pill whitespace-nowrap border border-white/20";
         }
     }
 
@@ -973,12 +1002,12 @@
 
         if (currentHour >= OPEN_HOUR && currentHour < CLOSE_HOUR) {
             isBuildingOpen = true;
-            alertBox.className = "bg-green-100 text-green-700 p-3 rounded-lg shadow-sm mb-3 text-sm font-bold text-center border border-green-300";
+            alertBox.className = "bg-green-100 text-green-700 p-3 rounded-xl shadow-sm mb-3 text-sm font-bold text-center border border-green-300";
             alertBox.innerHTML = "🟢 อาคารเปิดให้บริการ: เลือกห้องเพื่อจองล่วงหน้าได้เลย";
             mapArea.style.opacity = "1";
         } else {
             isBuildingOpen = false;
-            alertBox.className = "bg-red-100 text-red-700 p-3 rounded-lg shadow-sm mb-3 text-sm font-bold text-center border border-red-300";
+            alertBox.className = "bg-red-100 text-red-700 p-3 rounded-xl shadow-sm mb-3 text-sm font-bold text-center border border-red-300";
             alertBox.innerHTML = "🔴 นอกเวลาทำการของอาคาร (08:00 - 20:00 น.)<br><span class='text-xs font-normal'>* ยังสามารถจองล่วงหน้าสำหรับวันถัดไปได้ *</span>";
             mapArea.style.opacity = "0.6";
         }
@@ -1109,7 +1138,7 @@
         filtered.forEach(b => {
             const borderColor = b.status === 'approved' ? 'border-green-400' : b.status === 'rejected' ? 'border-red-400' : b.status === 'cancelled' ? 'border-gray-400' : 'border-yellow-400';
             const card = document.createElement('div');
-            card.className = `bg-white p-4 rounded-lg shadow border-l-4 ${borderColor}`;
+            card.className = `bg-white p-4 rounded-xl shadow border-l-4 ${borderColor}`;
             card.innerHTML = `
                 <div class="flex justify-between items-start mb-2 flex-wrap gap-1">
                     <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">ห้อง: ${b.room}</span>
@@ -1328,9 +1357,9 @@
 
         const actionsBox = document.getElementById('party-room-actions');
         if (isOwner) {
-            actionsBox.innerHTML = `<button onclick="cancelBooking('${booking.id}')" class="w-full bg-red-50 border border-red-300 text-red-600 py-2.5 rounded-lg text-sm font-bold hover:bg-red-100">❌ ยกเลิกห้องนี้ (สมาชิกทุกคนจะถูกดีดออก)</button>`;
+            actionsBox.innerHTML = `<button onclick="cancelBooking('${booking.id}')" class="w-full bg-red-50 border border-red-300 text-red-600 py-2.5 rounded-xl text-sm font-bold hover:bg-red-100">❌ ยกเลิกห้องนี้ (สมาชิกทุกคนจะถูกดีดออก)</button>`;
         } else {
-            actionsBox.innerHTML = `<button onclick="leaveParty('${booking.id}')" class="w-full bg-gray-100 border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-200">🚪 ออกจากห้อง</button>`;
+            actionsBox.innerHTML = `<button onclick="leaveParty('${booking.id}')" class="w-full bg-gray-100 border border-gray-300 text-gray-700 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-200">🚪 ออกจากห้อง</button>`;
         }
     }
 
@@ -1415,7 +1444,7 @@
             const r = movieRoundsCache[t.roundId];
             if (!r) return;
             const card = document.createElement('div');
-            card.className = "bg-white p-4 rounded-lg shadow-sm border-l-4 border-purple-400";
+            card.className = "bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-400";
             card.innerHTML = `
                 <div class="flex justify-between items-start mb-2">
                     <div>
@@ -1424,7 +1453,7 @@
                     </div>
                     ${t.checkedIn ? '<span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded shadow-sm">✅ เช็คอินแล้ว</span>' : '<span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1 rounded shadow-sm">🎟️ มีตั๋ว</span>'}
                 </div>
-                <button onclick="openMovieTicket('${t.roundId}', '${t.seat}')" class="w-full mt-3 bg-purple-50 border border-purple-300 text-purple-700 py-2 rounded-lg text-xs font-bold hover:bg-purple-100">🎟️ ดูตั๋ว / QR Code</button>
+                <button onclick="openMovieTicket('${t.roundId}', '${t.seat}')" class="w-full mt-3 bg-purple-50 border border-purple-300 text-purple-700 py-2 rounded-xl text-xs font-bold hover:bg-purple-100">🎟️ ดูตั๋ว / QR Code</button>
             `;
             container.appendChild(card);
         });
@@ -1434,7 +1463,7 @@
             const isOwner = c.creatorId === currentUserId;
             const canEnter = isClubActive(c);
             const card = document.createElement('div');
-            card.className = "bg-white p-4 rounded-lg shadow-sm border-l-4 border-fuchsia-400";
+            card.className = "bg-white p-4 rounded-xl shadow-sm border-l-4 border-fuchsia-400";
             card.innerHTML = `
                 <div class="flex justify-between items-start mb-2">
                     <div>
@@ -1445,7 +1474,7 @@
                 </div>
                 <p class="text-sm text-gray-600 border-t pt-2 mt-2">${c.activityDescription || '-'}</p>
                 <p class="text-[11px] text-fuchsia-700 font-bold mt-1">👥 ${(c.members || []).length}/${c.maxParticipants} คน</p>
-                ${canEnter ? `<button onclick="openClubDetail('${c.id}')" class="w-full mt-3 bg-fuchsia-50 border border-fuchsia-300 text-fuchsia-700 py-2 rounded-lg text-xs font-bold hover:bg-fuchsia-100">🎉 ดูรายละเอียดชมรม</button>` : ''}
+                ${canEnter ? `<button onclick="openClubDetail('${c.id}')" class="w-full mt-3 bg-fuchsia-50 border border-fuchsia-300 text-fuchsia-700 py-2 rounded-xl text-xs font-bold hover:bg-fuchsia-100">🎉 ดูรายละเอียดชมรม</button>` : ''}
             `;
             container.appendChild(card);
         });
@@ -1455,7 +1484,7 @@
             const isOwner = b.userId === currentUserId;
             const canEnterRoom = isBookingActive(b); // เข้าห้องปาร์ตี้ได้เฉพาะรายการที่ pending/approved และยังไม่หมดเวลา
             const card = document.createElement('div');
-            card.className = `bg-white p-4 rounded-lg shadow-sm border-l-4 ${borderColor}`;
+            card.className = `bg-white p-4 rounded-xl shadow-sm border-l-4 ${borderColor}`;
             card.innerHTML = `
                 <div class="flex justify-between items-start mb-2">
                     <div>
@@ -1466,7 +1495,7 @@
                 </div>
                 <p class="text-sm text-gray-600 border-t pt-2 mt-2">เหตุผล: ${b.reason}</p>
                 ${b.partyCode ? `<p class="text-[11px] text-cyan-700 font-bold mt-1">👥 ${(b.members || []).length}/${b.capacity || ROOM_CAPACITY} คน</p>` : ''}
-                ${canEnterRoom ? `<button onclick="openPartyRoom('${b.id}')" class="w-full mt-3 bg-cyan-50 border border-cyan-300 text-cyan-700 py-2 rounded-lg text-xs font-bold hover:bg-cyan-100">🔑 เข้าห้องปาร์ตี้</button>` : ''}
+                ${canEnterRoom ? `<button onclick="openPartyRoom('${b.id}')" class="w-full mt-3 bg-cyan-50 border border-cyan-300 text-cyan-700 py-2 rounded-xl text-xs font-bold hover:bg-cyan-100">🔑 เข้าห้องปาร์ตี้</button>` : ''}
             `;
             container.appendChild(card);
         });
@@ -1556,7 +1585,7 @@
             groups[date].sort((a, b) => a.startHour - b.startHour).forEach(i => {
                 const card = document.createElement('div');
                 const clickable = !!i.onClick;
-                card.className = `bg-white p-3 rounded-lg shadow-sm border-l-4 border-indigo-400 mb-2 flex items-center justify-between gap-2 ${clickable ? 'cursor-pointer hover:shadow-md transition' : 'opacity-70'}`;
+                card.className = `bg-white p-3 rounded-xl shadow-sm border-l-4 border-indigo-400 mb-2 flex items-center justify-between gap-2 ${clickable ? 'cursor-pointer hover:shadow-md transition' : 'opacity-70'}`;
                 if (clickable) card.setAttribute('onclick', i.onClick);
                 card.innerHTML = `
                     <div class="flex items-center gap-2 min-w-0">
@@ -1943,7 +1972,7 @@
             const total = totalSeatsOf(r);
             const isPast = r.date < todayStr();
             const card = document.createElement('div');
-            card.className = `bg-white rounded-lg shadow-sm border border-gray-200 p-3 ${isPast ? 'opacity-60' : ''}`;
+            card.className = `bg-white rounded-xl shadow-sm border border-gray-200 p-3 ${isPast ? 'opacity-60' : ''}`;
             card.innerHTML = `
                 <div class="flex gap-3">
                     <img src="${r.posterUrl || 'https://placehold.co/60x84?text=No+Poster'}" class="w-14 h-20 object-cover bg-gray-200 rounded flex-shrink-0">
@@ -2015,7 +2044,7 @@
         if (!info) {
             box.innerHTML = `
                 <p class="text-center text-red-600 font-bold py-3">${errorMsg}</p>
-                <button onclick="resumeMovieScanner()" class="w-full bg-gray-800 text-white py-2 rounded-lg text-sm font-bold">📷 สแกนต่อ</button>
+                <button onclick="resumeMovieScanner()" class="w-full bg-gray-800 text-white py-2 rounded-xl text-sm font-bold">📷 สแกนต่อ</button>
             `;
             return;
         }
@@ -2028,9 +2057,9 @@
             <p class="text-center text-xs text-gray-500 mb-4">${round.date} | ${round.startTime}-${round.endTime} | ${round.room || '-'}</p>
             ${seatData.checkedIn
                 ? `<p class="text-center text-green-600 font-bold mb-3">✅ เช็คอินไปแล้วเมื่อ ${formatCheckinTime(seatData.checkedInAt)}</p>`
-                : `<button onclick="confirmMovieCheckIn('${roundId}', '${seat}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold text-sm mb-3">✅ ยืนยันเข้าห้อง</button>`
+                : `<button onclick="confirmMovieCheckIn('${roundId}', '${seat}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl font-bold text-sm mb-3">✅ ยืนยันเข้าห้อง</button>`
             }
-            <button onclick="resumeMovieScanner()" class="w-full bg-gray-100 text-gray-600 py-2 rounded-lg text-sm font-bold">📷 สแกนคนต่อไป</button>
+            <button onclick="resumeMovieScanner()" class="w-full bg-gray-100 text-gray-600 py-2 rounded-xl text-sm font-bold">📷 สแกนคนต่อไป</button>
         `;
     }
 
@@ -2280,7 +2309,7 @@
         if (!info) {
             box.innerHTML = `
                 <p class="text-center text-red-600 font-bold py-3">${errorMsg}</p>
-                <button onclick="resumeUnifiedScanner()" class="w-full bg-gray-800 text-white py-2 rounded-lg text-sm font-bold">📷 สแกนต่อ</button>
+                <button onclick="resumeUnifiedScanner()" class="w-full bg-gray-800 text-white py-2 rounded-xl text-sm font-bold">📷 สแกนต่อ</button>
             `;
             return;
         }
@@ -2292,9 +2321,9 @@
             <p class="text-2xl font-black text-center text-cyan-700 mb-2">${info.userId}</p>
             ${info.checkedIn
                 ? `<p class="text-center text-green-600 font-bold mb-3">✅ เช็คอินไปแล้วเมื่อ ${formatCheckinTime(info.checkedInAt)}</p>`
-                : `<button onclick="${confirmFn}('${info.refId}', '${info.userId}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold text-sm mb-3">✅ ยืนยันเช็คอิน</button>`
+                : `<button onclick="${confirmFn}('${info.refId}', '${info.userId}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl font-bold text-sm mb-3">✅ ยืนยันเช็คอิน</button>`
             }
-            <button onclick="resumeUnifiedScanner()" class="w-full bg-gray-100 text-gray-600 py-2 rounded-lg text-sm font-bold">📷 สแกนคนต่อไป</button>
+            <button onclick="resumeUnifiedScanner()" class="w-full bg-gray-100 text-gray-600 py-2 rounded-xl text-sm font-bold">📷 สแกนคนต่อไป</button>
         `;
     }
 
@@ -2559,7 +2588,7 @@
         }
         wrap.classList.remove('hidden-view');
         wrap.innerHTML = pending.map(c => `
-            <div class="bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-center justify-between gap-2 mb-2">
+            <div class="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-center justify-between gap-2 mb-2">
                 <div class="min-w-0">
                     <p class="text-xs font-bold text-amber-800 truncate">⭐ รีวิว "${c.name}" กันหน่อย!</p>
                     <p class="text-[10px] text-amber-600">คุณเพิ่งเข้าร่วมกิจกรรมนี้ไป (${c.date})</p>
@@ -2657,7 +2686,7 @@
 
         const medals = ['🥇', '🥈', '🥉', '4.', '5.'];
         listEl.innerHTML = withStats.map((x, i) => `
-            <div class="flex items-center justify-between bg-white/15 rounded-lg px-3 py-2 cursor-pointer" onclick="openClubDetail('${x.c.id}')">
+            <div class="flex items-center justify-between bg-white/15 rounded-xl px-3 py-2 cursor-pointer" onclick="openClubDetail('${x.c.id}')">
                 <span class="text-xs font-bold truncate">${medals[i]} ${x.c.name}</span>
                 <span class="text-[10px] whitespace-nowrap ml-2">👥 ${x.stats.checkedInCount} &nbsp; ⭐ ${x.stats.avgRating.toFixed(1)}</span>
             </div>
@@ -2893,15 +2922,15 @@
 
         const actionsBox = document.getElementById('club-detail-actions');
         if (isCreator) {
-            actionsBox.innerHTML = `<button onclick="cancelClub('${c.id}')" class="w-full bg-red-50 border border-red-300 text-red-600 py-2.5 rounded-lg text-sm font-bold hover:bg-red-100">❌ ยกเลิกชมรมนี้ (สมาชิกทุกคนจะถูกดีดออก)</button>`;
+            actionsBox.innerHTML = `<button onclick="cancelClub('${c.id}')" class="w-full bg-red-50 border border-red-300 text-red-600 py-2.5 rounded-xl text-sm font-bold hover:bg-red-100">❌ ยกเลิกชมรมนี้ (สมาชิกทุกคนจะถูกดีดออก)</button>`;
         } else if (isMember) {
-            actionsBox.innerHTML = `<button onclick="leaveClub('${c.id}')" class="w-full bg-gray-100 border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-200">🚪 ออกจากชมรม</button>`;
+            actionsBox.innerHTML = `<button onclick="leaveClub('${c.id}')" class="w-full bg-gray-100 border border-gray-300 text-gray-700 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-200">🚪 ออกจากชมรม</button>`;
         } else if (c.status !== 'approved') {
             actionsBox.innerHTML = `<p class="text-center text-xs text-gray-400 py-2">ชมรมนี้ยังไม่เปิดให้เข้าร่วม (รออนุมัติ)</p>`;
         } else if (isFull) {
             actionsBox.innerHTML = `<p class="text-center text-xs text-red-500 font-bold py-2">😢 ชมรมนี้เต็มแล้วครับ</p>`;
         } else {
-            actionsBox.innerHTML = `<button onclick="joinClub('${c.id}')" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg font-bold text-sm">🎉 เข้าร่วมชมรมนี้</button>`;
+            actionsBox.innerHTML = `<button onclick="joinClub('${c.id}')" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl font-bold text-sm">🎉 เข้าร่วมชมรมนี้</button>`;
         }
     }
 
@@ -3033,7 +3062,7 @@
             const members = c.members || [];
             const borderColor = c.status === 'approved' ? 'border-green-400' : c.status === 'rejected' ? 'border-red-400' : c.status === 'cancelled' ? 'border-gray-400' : 'border-yellow-400';
             const card = document.createElement('div');
-            card.className = `bg-white p-4 rounded-lg shadow border-l-4 ${borderColor}`;
+            card.className = `bg-white p-4 rounded-xl shadow border-l-4 ${borderColor}`;
             card.innerHTML = `
                 <div class="flex justify-between items-start mb-2 flex-wrap gap-1">
                     <span class="bg-purple-100 text-purple-800 text-xs font-bold px-2 py-1 rounded">${c.name}</span>
@@ -3066,7 +3095,7 @@
             .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
             .slice(0, 3)
             .forEach(r => items.push({
-                html: `<div class="bg-white border border-purple-200 rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:shadow-sm transition" onclick="switchView('view-movie-club')">
+                html: `<div class="bg-white border border-purple-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:shadow-sm transition" onclick="switchView('view-movie-club')">
                     <span class="text-2xl">🎬</span>
                     <div class="min-w-0">
                         <p class="text-xs font-bold text-gray-800 truncate">${r.title || 'Movie Club'} — ${r.date}</p>
@@ -3081,7 +3110,7 @@
             .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
             .slice(0, 3)
             .forEach(c => items.push({
-                html: `<div class="bg-white border border-purple-200 rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:shadow-sm transition" onclick="openClubDetail('${c.id}')">
+                html: `<div class="bg-white border border-purple-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:shadow-sm transition" onclick="openClubDetail('${c.id}')">
                     <span class="text-2xl">🎉</span>
                     <div class="min-w-0">
                         <p class="text-xs font-bold text-gray-800 truncate">${c.name} — ${c.date}</p>
@@ -3172,7 +3201,7 @@
             const timeText = `${startTime}-${endTime}`;
 
             const btn = document.createElement('button');
-            btn.className = "time-slot text-xs py-2 rounded-lg text-center font-semibold w-full ";
+            btn.className = "time-slot text-xs py-2 rounded-xl text-center font-semibold w-full ";
 
             if (isToday && i < currentHour) {
                 btn.classList.add('slot-past');
@@ -3299,11 +3328,11 @@
             const capacity = existing.capacity || ROOM_CAPACITY;
             if (existing.status === 'approved' && memberCount < capacity) {
                 partySection = `
-                    <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-3 mb-3">
+                    <div class="bg-cyan-50 border border-cyan-200 rounded-xl p-3 mb-3">
                         <p class="text-xs font-bold text-cyan-800 mb-2">🎉 ห้องนี้กำลังมีปาร์ตี้อยู่ (${memberCount}/${capacity} คน) ยังร่วมได้! มีรหัสมั้ย?</p>
                         <div class="flex gap-2">
-                            <input type="text" id="inline-join-code" maxlength="6" placeholder="กรอกรหัส 6 หลัก" class="flex-1 p-2 border border-cyan-300 rounded-lg text-sm text-center tracking-widest uppercase font-bold" oninput="this.value = this.value.toUpperCase()">
-                            <button onclick="joinPartyByCode(document.getElementById('inline-join-code').value)" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 rounded-lg text-sm font-bold whitespace-nowrap">เข้าร่วม</button>
+                            <input type="text" id="inline-join-code" maxlength="6" placeholder="กรอกรหัส 6 หลัก" class="flex-1 p-2 border border-cyan-300 rounded-xl text-sm text-center tracking-widest uppercase font-bold" oninput="this.value = this.value.toUpperCase()">
+                            <button onclick="joinPartyByCode(document.getElementById('inline-join-code').value)" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 rounded-xl text-sm font-bold whitespace-nowrap">เข้าร่วม</button>
                         </div>
                     </div>`;
             } else if (existing.status === 'approved') {
