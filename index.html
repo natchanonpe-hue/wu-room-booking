@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+<script>
+    // เช็คโหมดที่เคยเลือกไว้ทันที ก่อนหน้าเว็บ render กันการกระพริบสีตอนโหลด
+    try { if (localStorage.getItem('wu_theme') === 'light') document.documentElement.classList.add('theme-light'); } catch(e) {}
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WU Room Booking System (Complete Edition)</title>
@@ -24,12 +28,30 @@
         --surface: #171207;     /* การ์ด ดำอมน้ำตาลเข้ม */
         --canvas: #100C05;      /* พื้นหลังหลัก เกือบดำสนิท */
         --line: #3B301A;        /* เส้นขอบ ทองหม่น */
+        --body-bg: radial-gradient(ellipse 130% 55% at 50% -8%, #241C0C 0%, #140F07 45%, #0A0704 100%);
+        --header-bg: #0C0904;
+        --header-border: var(--brand-dark);
         --shadow-soft: 0 1px 2px rgba(0,0,0,.5), 0 8px 26px -10px rgba(216,178,76,.28);
         --shadow-pop: 0 14px 36px -10px rgba(216,178,76,.5);
     }
+    /* ☀️ โหมดสว่าง (Light Gold) — ยังคงคาแรกเตอร์สีทองไว้ แต่พื้นเป็นครีม/ขาวแทนดำ */
+    html.theme-light {
+        --ink: #2B2210;
+        --ink-soft: #7A6B45;
+        --brand: #B8892A;
+        --brand-dark: #8F681C;
+        --surface: #FFFFFF;
+        --canvas: #FBF6EA;
+        --line: #EAE0C4;
+        --body-bg: radial-gradient(ellipse 130% 55% at 50% -8%, #FFFDF6 0%, #FBF6EA 45%, #F7EFDC 100%);
+        --header-bg: #FFFFFF;
+        --header-border: #EAE0C4;
+        --shadow-soft: 0 1px 2px rgba(80,60,10,.06), 0 8px 22px -10px rgba(184,137,42,.18);
+        --shadow-pop: 0 14px 32px -10px rgba(184,137,42,.35);
+    }
     * { font-family: 'Plus Jakarta Sans', 'Noto Sans Thai', sans-serif; }
     h1, h2, h3, .font-serif-lux { font-family: 'Playfair Display', 'Noto Sans Thai', serif; letter-spacing: .01em; }
-    body { background: radial-gradient(ellipse 130% 55% at 50% -8%, #241C0C 0%, #140F07 45%, #0A0704 100%); color: var(--ink); }
+    body { background: var(--body-bg); color: var(--ink); transition: background .2s ease, color .2s ease; }
     .app-card { background: var(--surface); border-radius: 1.25rem; box-shadow: var(--shadow-soft); border: 1px solid var(--line); }
     .app-card-flat { background: var(--surface); border-radius: 1rem; border: 1px solid var(--line); }
     .btn-brand { background: linear-gradient(135deg, var(--brand), var(--brand-dark)); color: #1A1204; border-radius: 1rem; font-weight: 700; box-shadow: var(--shadow-pop); transition: transform .15s ease, box-shadow .15s ease; }
@@ -74,12 +96,13 @@
     <!-- ========================================== -->
     <!-- ส่วนหัว (Header) & นาฬิกา -->
     <!-- ========================================== -->
-    <header class="w-full max-w-md p-4 flex justify-between items-center sticky top-0 z-50" style="background:#0C0904; border-bottom:1px solid var(--brand-dark); box-shadow: 0 8px 24px -8px rgba(216,178,76,.25);">
+    <header class="w-full max-w-md p-4 flex justify-between items-center sticky top-0 z-50" style="background:var(--header-bg); border-bottom:1px solid var(--header-border); box-shadow: 0 8px 24px -8px rgba(216,178,76,.25); transition: background .2s ease, border-color .2s ease;">
         <div>
             <h1 class="text-lg font-extrabold tracking-tight" id="header-title" style="color:var(--brand); font-family:'Playfair Display',serif;">WU Room Booking</h1>
             <p class="text-[10px]" style="color:var(--ink-soft)">ระบบจองห้องเรียนล่วงหน้า</p>
         </div>
         <div class="flex items-center gap-2">
+            <button id="theme-toggle-btn" onclick="toggleTheme()" title="สลับโหมดสว่าง/มืด" class="text-sm w-8 h-8 flex items-center justify-center pill" style="background:rgba(216,178,76,.12); border:1px solid var(--line);">🌙</button>
             <button id="notify-toggle-btn" onclick="requestNotificationPermission()" class="text-[10px] font-bold px-2.5 py-1.5 pill whitespace-nowrap" style="background:rgba(216,178,76,.12); color:var(--brand); border:1px solid var(--line);">🔕 เปิดแจ้งเตือน</button>
             <div class="text-right px-3 py-1 rounded-xl" style="background:rgba(216,178,76,.1); border:1px solid var(--line);">
                 <p class="text-[10px]" style="color:var(--ink-soft)">เวลาปัจจุบัน</p>
@@ -976,6 +999,28 @@
                 .then((token) => { if (token) db.ref('fcmTokens/admin').set(token); })
                 .catch((err) => console.error("getToken error:", err));
         });
+    }
+
+    // ==========================================
+    // 🌗 ระบบสลับโหมดสว่าง/มืด (Light Gold / Dark Gold)
+    // ==========================================
+    function initTheme() {
+        // คลาส theme-light ถูกใส่ไปแล้วตั้งแต่ inline script บนสุดของ <head> (กันการกระพริบสีตอนโหลด)
+        updateThemeToggleIcon();
+    }
+
+    function toggleTheme() {
+        document.documentElement.classList.toggle('theme-light');
+        const isLight = document.documentElement.classList.contains('theme-light');
+        try { localStorage.setItem('wu_theme', isLight ? 'light' : 'dark'); } catch(e) {}
+        updateThemeToggleIcon();
+    }
+
+    function updateThemeToggleIcon() {
+        const btn = document.getElementById('theme-toggle-btn');
+        if (!btn) return;
+        const isLight = document.documentElement.classList.contains('theme-light');
+        btn.innerText = isLight ? '☀️' : '🌙';
     }
 
     function updateNotifyButtonUI() {
@@ -3465,6 +3510,7 @@
     // ==========================================
     // 8. เริ่มต้นระบบ
     // ==========================================
+    initTheme();
     initFirebaseSync();
     initMovieClubSync();
     initClubsSync();
