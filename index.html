@@ -6,7 +6,7 @@
 <title>WU Room Booking System (Complete Edition)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <!-- Firebase SDK (compat build เพื่อให้ใช้ onclick="..." แบบเดิมในหน้า HTML ได้โดยไม่ต้องแก้ทั้งไฟล์) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -17,26 +17,38 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
     :root {
-        --ink: #1E1B3A;         /* ข้อความหลัก อบอุ่นกว่าดำล้วน */
-        --ink-soft: #6B6693;    /* ข้อความรอง */
-        --brand: #4F3FF0;       /* ม่วง-อินดิโก้ สดใส เป็นสีหลักของแอป */
-        --brand-dark: #3B2FC7;
-        --surface: #ffffff;
-        --canvas: #F5F3FF;      /* พื้นหลังม่วงอ่อนมาก อุ่นตา */
-        --line: #EBE7FB;
-        --shadow-soft: 0 1px 2px rgba(30,27,58,.04), 0 6px 20px -8px rgba(79,63,240,.18);
-        --shadow-pop: 0 10px 30px -10px rgba(79,63,240,.35);
+        --ink: #F3E9D2;         /* ข้อความหลัก ครีมทองอุ่นบนพื้นดำ */
+        --ink-soft: #B8A97E;    /* ข้อความรอง บรอนซ์อ่อน */
+        --brand: #D8B24C;       /* ทองคำ สีหลักของแอป */
+        --brand-dark: #A8791E;  /* ทองเข้ม/บรอนซ์ */
+        --surface: #171207;     /* การ์ด ดำอมน้ำตาลเข้ม */
+        --canvas: #100C05;      /* พื้นหลังหลัก เกือบดำสนิท */
+        --line: #3B301A;        /* เส้นขอบ ทองหม่น */
+        --shadow-soft: 0 1px 2px rgba(0,0,0,.5), 0 8px 26px -10px rgba(216,178,76,.28);
+        --shadow-pop: 0 14px 36px -10px rgba(216,178,76,.5);
     }
     * { font-family: 'Plus Jakarta Sans', 'Noto Sans Thai', sans-serif; }
-    body { background: radial-gradient(ellipse 120% 60% at 50% -10%, #EDE9FE 0%, #F5F3FF 45%, #FAF9FF 100%); color: var(--ink); }
+    h1, h2, h3, .font-serif-lux { font-family: 'Playfair Display', 'Noto Sans Thai', serif; letter-spacing: .01em; }
+    body { background: radial-gradient(ellipse 130% 55% at 50% -8%, #241C0C 0%, #140F07 45%, #0A0704 100%); color: var(--ink); }
     .app-card { background: var(--surface); border-radius: 1.25rem; box-shadow: var(--shadow-soft); border: 1px solid var(--line); }
     .app-card-flat { background: var(--surface); border-radius: 1rem; border: 1px solid var(--line); }
-    .btn-brand { background: linear-gradient(135deg, var(--brand), var(--brand-dark)); color: #fff; border-radius: 1rem; font-weight: 700; box-shadow: var(--shadow-pop); transition: transform .15s ease, box-shadow .15s ease; }
-    .btn-brand:hover { transform: translateY(-1px); box-shadow: 0 14px 34px -10px rgba(79,63,240,.45); }
+    .btn-brand { background: linear-gradient(135deg, var(--brand), var(--brand-dark)); color: #1A1204; border-radius: 1rem; font-weight: 700; box-shadow: var(--shadow-pop); transition: transform .15s ease, box-shadow .15s ease; }
+    .btn-brand:hover { transform: translateY(-1px); box-shadow: 0 18px 40px -10px rgba(216,178,76,.6); }
     .btn-brand:active { transform: translateY(0); }
     .pill { border-radius: 999px; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-thumb { background: #D8D2F7; border-radius: 999px; }
+    ::-webkit-scrollbar-thumb { background: var(--brand-dark); border-radius: 999px; }
+
+    /* 🖤✨ Global retheme: ปรับสีกลางของ Tailwind ทั้งแอปให้เข้าธีมดำ-ทอง โดยไม่ต้องแก้ทีละหน้า */
+    .bg-white { background-color: var(--surface) !important; }
+    .bg-gray-50, .bg-gray-100 { background-color: #1D1608 !important; }
+    .bg-gray-200 { background-color: #2A2110 !important; }
+    .text-gray-800, .text-gray-700 { color: var(--ink) !important; }
+    .text-gray-600, .text-gray-500 { color: var(--ink-soft) !important; }
+    .text-gray-400 { color: #8C7B4E !important; }
+    .border-gray-100, .border-gray-200, .border-gray-300 { border-color: var(--line) !important; }
+    input, textarea, select { background-color: #1D1608 !important; color: var(--ink) !important; border-color: var(--line) !important; }
+    input::placeholder, textarea::placeholder { color: #6B5D37 !important; }
 
     .map-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .hidden-view { display: none !important; }
@@ -62,16 +74,16 @@
     <!-- ========================================== -->
     <!-- ส่วนหัว (Header) & นาฬิกา -->
     <!-- ========================================== -->
-    <header class="w-full max-w-md text-white p-4 flex justify-between items-center sticky top-0 z-50" style="background: linear-gradient(135deg, var(--brand), var(--brand-dark)); box-shadow: 0 8px 24px -8px rgba(79,63,240,.45);">
+    <header class="w-full max-w-md p-4 flex justify-between items-center sticky top-0 z-50" style="background:#0C0904; border-bottom:1px solid var(--brand-dark); box-shadow: 0 8px 24px -8px rgba(216,178,76,.25);">
         <div>
-            <h1 class="text-lg font-extrabold tracking-tight" id="header-title">WU Room Booking</h1>
-            <p class="text-[10px] text-white/70">ระบบจองห้องเรียนล่วงหน้า</p>
+            <h1 class="text-lg font-extrabold tracking-tight" id="header-title" style="color:var(--brand); font-family:'Playfair Display',serif;">WU Room Booking</h1>
+            <p class="text-[10px]" style="color:var(--ink-soft)">ระบบจองห้องเรียนล่วงหน้า</p>
         </div>
         <div class="flex items-center gap-2">
-            <button id="notify-toggle-btn" onclick="requestNotificationPermission()" class="bg-white/15 backdrop-blur text-white text-[10px] font-bold px-2.5 py-1.5 pill whitespace-nowrap border border-white/20">🔕 เปิดแจ้งเตือน</button>
-            <div class="text-right bg-white/15 backdrop-blur px-3 py-1 rounded-xl border border-white/20">
-                <p class="text-[10px] text-white/70">เวลาปัจจุบัน</p>
-                <p class="text-sm font-bold tracking-wider font-mono" id="live-clock">--:--:--</p>
+            <button id="notify-toggle-btn" onclick="requestNotificationPermission()" class="text-[10px] font-bold px-2.5 py-1.5 pill whitespace-nowrap" style="background:rgba(216,178,76,.12); color:var(--brand); border:1px solid var(--line);">🔕 เปิดแจ้งเตือน</button>
+            <div class="text-right px-3 py-1 rounded-xl" style="background:rgba(216,178,76,.1); border:1px solid var(--line);">
+                <p class="text-[10px]" style="color:var(--ink-soft)">เวลาปัจจุบัน</p>
+                <p class="text-sm font-bold tracking-wider font-mono" id="live-clock" style="color:var(--brand);">--:--:--</p>
             </div>
         </div>
     </header>
@@ -90,7 +102,7 @@
             <button onclick="checkUserRole()" class="w-full app-card py-4 px-5 font-bold text-lg flex items-center justify-center gap-3 transition hover:-translate-y-0.5" style="color:var(--brand);">
                 👨‍🎓 ผู้ใช้งานทั่วไป (นักศึกษา/อาจารย์)
             </button>
-            <button onclick="switchView('view-login')" class="w-full py-4 px-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 text-white transition hover:-translate-y-0.5" style="background:var(--ink); box-shadow:var(--shadow-soft);">
+            <button onclick="switchView('view-login')" class="w-full py-4 px-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition hover:-translate-y-0.5" style="background:#050403; color:var(--brand); border:1px solid var(--brand-dark); box-shadow:var(--shadow-soft);">
                 ⚙️ ผู้ดูแลระบบ (Admin)
             </button>
         </div>
@@ -160,7 +172,7 @@
             <!-- 🧩 Bento grid: การ์ดขนาดต่างกัน เห็นสถานะทุกอย่างรวดเดียว -->
             <div class="grid grid-cols-2 gap-3 mb-4">
                 <!-- 🌟 คะแนนจิตพิสัย (เต็มความกว้าง) -->
-                <div id="hub-score-card" class="col-span-2 rounded-2xl p-4 flex items-center justify-between text-white" style="background:#0E9C77; box-shadow: var(--shadow-soft);">
+                <div id="hub-score-card" class="col-span-2 rounded-2xl p-4 flex items-center justify-between" style="background: linear-gradient(135deg, var(--brand), var(--brand-dark)); color:#1A1204; box-shadow: var(--shadow-pop);">
                     <div>
                         <p class="text-xs opacity-90">🌟 คะแนนจิตพิสัยของคุณ</p>
                         <p id="hub-score-note" class="text-[11px] opacity-90 mt-0.5"></p>
@@ -169,20 +181,20 @@
                 </div>
 
                 <!-- 📅 จองห้อง -->
-                <button onclick="switchView('view-building')" class="rounded-2xl p-4 text-left text-white transition hover:-translate-y-0.5 flex flex-col justify-between" style="background:#3568F2; min-height:118px; box-shadow: var(--shadow-soft);">
+                <button onclick="switchView('view-building')" class="rounded-2xl p-4 text-left transition hover:-translate-y-0.5 flex flex-col justify-between" style="background:var(--surface); border:1px solid var(--line); min-height:118px; box-shadow: var(--shadow-soft);">
                     <span class="text-2xl">📅</span>
                     <div>
-                        <h3 class="font-extrabold text-sm">จองห้องเรียน</h3>
-                        <p class="text-[10px] text-white/75 mt-0.5">เลือกอาคาร/ห้อง</p>
+                        <h3 class="font-extrabold text-sm" style="color:var(--brand)">จองห้องเรียน</h3>
+                        <p class="text-[10px] mt-0.5" style="color:var(--ink-soft)">เลือกอาคาร/ห้อง</p>
                     </div>
                 </button>
 
                 <!-- 🎉 คลับ -->
-                <button onclick="switchView('view-club-list')" class="rounded-2xl p-4 text-left text-white transition hover:-translate-y-0.5 flex flex-col justify-between" style="background:#E2583F; min-height:118px; box-shadow: var(--shadow-soft);">
+                <button onclick="switchView('view-club-list')" class="rounded-2xl p-4 text-left transition hover:-translate-y-0.5 flex flex-col justify-between" style="background:var(--surface); border:1px solid var(--line); min-height:118px; box-shadow: var(--shadow-soft);">
                     <span class="text-2xl">🎉</span>
                     <div>
-                        <h3 class="font-extrabold text-sm">เข้าร่วมชมรม</h3>
-                        <p class="text-[10px] text-white/75 mt-0.5">Movie Club และอื่นๆ</p>
+                        <h3 class="font-extrabold text-sm" style="color:var(--brand)">เข้าร่วมชมรม</h3>
+                        <p class="text-[10px] mt-0.5" style="color:var(--ink-soft)">Movie Club และอื่นๆ</p>
                     </div>
                 </button>
 
@@ -197,12 +209,12 @@
             <div id="hub-review-prompt-wrap" class="hidden-view mb-4"></div>
 
             <!-- 📢 ป้ายแจ้งข่าว/อัปเดตล่าสุด -->
-            <div class="rounded-2xl p-3.5" style="background:#FDF3E1; border:1px solid #F2DFB4;">
-                <h3 class="text-xs font-bold mb-2 uppercase tracking-wide" style="color:#95661B;">📢 มีอะไรใหม่</h3>
+            <div class="rounded-2xl p-3.5" style="background:var(--surface); border:1px solid var(--line);">
+                <h3 class="text-xs font-bold mb-2 uppercase tracking-wide" style="color:var(--brand);">📢 มีอะไรใหม่</h3>
                 <div id="hub-whats-new" class="space-y-2">
                     <!-- สร้างด้วย JavaScript -->
                 </div>
-                <p id="hub-whats-new-empty" class="hidden-view text-center text-xs py-4" style="color:#B0894F;">ยังไม่มีอัปเดตใหม่ตอนนี้ครับ</p>
+                <p id="hub-whats-new-empty" class="hidden-view text-center text-xs py-4" style="color:var(--ink-soft);">ยังไม่มีอัปเดตใหม่ตอนนี้ครับ</p>
             </div>
         </div>
 
@@ -807,7 +819,7 @@
     </main>
 
     <!-- Toast แจ้งเตือนแบบลอย -->
-    <div id="toast" class="hidden-view fixed bottom-6 left-1/2 -translate-x-1/2 text-white text-sm font-bold px-4 py-2.5 pill z-50 toast" style="background:var(--ink); box-shadow:0 10px 30px -8px rgba(30,27,58,.5);"></div>
+    <div id="toast" class="hidden-view fixed bottom-6 left-1/2 -translate-x-1/2 text-sm font-bold px-4 py-2.5 pill z-50 toast" style="background:#0C0904; color:var(--brand); border:1px solid var(--brand-dark); box-shadow:0 10px 30px -8px rgba(216,178,76,.4);"></div>
 
 <script>
     // ==========================================
@@ -971,10 +983,12 @@
         if (!btn) return;
         if (notificationsEnabled) {
             btn.innerText = "🔔 แจ้งเตือนเปิดอยู่";
-            btn.className = "bg-emerald-400/90 text-emerald-950 text-[10px] font-bold px-2.5 py-1.5 pill whitespace-nowrap border border-white/20";
+            btn.className = "text-[10px] font-bold px-2.5 py-1.5 pill whitespace-nowrap";
+            btn.style.cssText = "background: var(--brand); color:#1A1204; border:1px solid var(--brand-dark);";
         } else {
             btn.innerText = "🔕 เปิดแจ้งเตือน";
-            btn.className = "bg-white/15 backdrop-blur text-white text-[10px] font-bold px-2.5 py-1.5 pill whitespace-nowrap border border-white/20";
+            btn.className = "text-[10px] font-bold px-2.5 py-1.5 pill whitespace-nowrap";
+            btn.style.cssText = "background:rgba(216,178,76,.12); color:var(--brand); border:1px solid var(--line);";
         }
     }
 
